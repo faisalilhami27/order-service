@@ -1,0 +1,44 @@
+package config
+
+import (
+	"github.com/spf13/viper"
+
+	"log"
+	"os"
+
+	"order-service/utils"
+)
+
+var Config AppConfig
+
+type AppConfig struct {
+	Port         int      `json:"port" yaml:"port"`
+	AppName      string   `json:"appName" yaml:"appName"`
+	AppEnv       string   `json:"appEnv" yaml:"appEnv"`
+	SignatureKey string   `json:"signatureKey" yaml:"signatureKey"`
+	Database     Database `json:"database" yaml:"database"`
+}
+
+type Database struct {
+	Host                  string `json:"host" yaml:"host"`
+	Port                  int    `json:"port" yaml:"port"`
+	Name                  string `json:"name" yaml:"name"`
+	Username              string `json:"username" yaml:"username"`
+	Password              string `json:"password" yaml:"password"`
+	MaxOpenConnection     int    `json:"maxOpenConnection" yaml:"maxOpenConnection"`
+	MaxLifetimeConnection int    `json:"maxLifetimeConnection" yaml:"maxLifetimeConnection"`
+	MaxIdleConnection     int    `json:"maxIdleConnection" yaml:"maxIdleConnection"`
+	MaxIdleTime           int    `json:"maxIdleTime" yaml:"maxIdleTime"`
+	AutoMigrate           bool   `json:"autoMigrate" yaml:"autoMigrate"`
+}
+
+func Init() {
+	err := utils.BindFromJSON(&Config, "config.json", ".")
+	if err != nil {
+		log.Printf("failed load cold config from file: %s", viper.ConfigFileUsed())
+		err = utils.BindFromConsul(&Config, os.Getenv("CONSUL_HTTP_URL"), os.Getenv("CONSUL_HTTP_KEY"))
+		if err != nil {
+			panic(err)
+		}
+	}
+}
