@@ -31,10 +31,10 @@ app
 <h3>How to run</h3>
 
 - Clone this repository
-- npm install
-- copy .env.example to .env
-- npx sequelize db:migrate
-- npm run dev
+- go mod tidy
+- copy .env.example to .env (if you want to run with consul)
+- copy .config.example.json to .config.json
+- make start
 
 <h3>How to run with docker</h3>
 
