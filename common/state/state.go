@@ -11,7 +11,7 @@ var mapProcessFlow = map[string]fsm.Events{
 	status: {
 		{
 			Name: constant.Pending.String(),
-			Src:  []string{constant.Inital.String()},
+			Src:  []string{constant.Initial.String()},
 			Dst:  constant.Pending.String(),
 		},
 		{

@@ -19,6 +19,11 @@ type OrderRequest struct { //nolint:revive
 	IsPaid     *bool                `json:"is_paid"`
 }
 
+type OrderRequestParam struct { //nolint:revive
+	Page  int `form:"page" validate:"required"`
+	Limit int `form:"limit" validate:"required"`
+}
+
 type OrderResponse struct { //nolint:revive
 	UUID        uuid.UUID                             `json:"orderID"`
 	OrderName   string                                `json:"orderName"`

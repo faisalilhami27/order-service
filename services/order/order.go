@@ -4,6 +4,7 @@ import (
 	"context"
 	orderPaymentDTO "order-service/domain/dto/orderpayment"
 	orderPaymentModel "order-service/domain/models/orderpayment"
+	"order-service/utils"
 
 	"gorm.io/gorm"
 
@@ -23,12 +24,59 @@ type IOrder struct {
 
 type IOrderService interface {
 	CreateOrder(context.Context, *orderDTO.OrderRequest) (*orderDTO.OrderResponse, error)
+	GetOrderList(context.Context, *orderDTO.OrderRequestParam) (*utils.PaginationResult, error)
 }
 
 func NewOrderService(repository repositories.IRepositoryRegistry) IOrderService {
 	return &IOrder{
 		repository: repository,
 	}
+}
+
+func (o *IOrder) GetOrderList(
+	ctx context.Context,
+	request *orderDTO.OrderRequestParam,
+) (*utils.PaginationResult, error) {
+	var (
+		orders []orderModel.Order
+		total  int64
+	)
+	orders, total, err := o.repository.GetOrderRepository().FindAllWithPagination(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	orderResponses := make([]orderDTO.OrderResponse, 0, len(orders))
+	for _, order := range orders {
+		orderResponses = append(orderResponses, orderDTO.OrderResponse{
+			UUID:        order.UUID,
+			OrderName:   order.OrderName,
+			CustomerID:  order.CustomerID,
+			PackageID:   order.PackageID,
+			Amount:      order.Amount,
+			Status:      order.Status,
+			OrderDate:   order.OrderDate,
+			IsPaid:      order.IsPaid,
+			CompletedAt: order.CompletedAt,
+			CreatedAt:   order.CreatedAt,
+			UpdatedAt:   order.UpdatedAt,
+			Payment: &orderPaymentDTO.OrderPaymentResponse{
+				PaymentID:  order.Payment.PaymentID,
+				InvoiceID:  order.Payment.InvoiceID,
+				PaymentURL: order.Payment.PaymentURL,
+				Status:     order.Payment.Status,
+			},
+		})
+	}
+
+	pagination := utils.PaginationParam{
+		Count: total,
+		Page:  request.Page,
+		Limit: request.Limit,
+		Data:  orderResponses,
+	}
+	response := utils.GeneratePagination(pagination)
+	return &response, nil
 }
 
 func (o *IOrder) CreateOrder(ctx context.Context, request *orderDTO.OrderRequest) (*orderDTO.OrderResponse, error) {

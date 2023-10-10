@@ -27,5 +27,6 @@ func NewOrderRoute(
 
 func (o *OrderRoute) Run() {
 	group := o.route.Group("/order")
+	group.GET("", o.controller.GetOrder().GetOrderList)
 	group.POST("", o.controller.GetOrder().CreateOrder)
 }

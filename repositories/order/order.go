@@ -28,12 +28,45 @@ type IOrderRepository interface {
 	Create(context.Context, *gorm.DB, *orderDTO.OrderRequest) (*orderModel.Order, error)
 	FindOneOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*orderModel.Order, error)
 	FindOneByUUID(context.Context, string) (*orderModel.Order, error)
+	FindAllWithPagination(context.Context, *orderDTO.OrderRequestParam) ([]orderModel.Order, int64, error)
 }
 
 func NewOrder(db *gorm.DB) IOrderRepository {
 	return &IOrder{
 		db: db,
 	}
+}
+
+func (o *IOrder) FindAllWithPagination(
+	ctx context.Context,
+	request *orderDTO.OrderRequestParam,
+) ([]orderModel.Order, int64, error) {
+	var (
+		order []orderModel.Order
+		total int64
+	)
+	limit := request.Limit
+	offset := (request.Page - 1) * limit
+	err := o.db.WithContext(ctx).
+		Preload("Payment").
+		Limit(limit).
+		Offset(offset).
+		First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, errOrder.ErrOrderNotFound
+		}
+		return nil, 0, err
+	}
+
+	err = o.db.WithContext(ctx).
+		Model(&order).
+		Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return order, total, nil
 }
 
 func (o *IOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*orderModel.Order, error) {
@@ -90,7 +123,7 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		IsPaid:     &isPaid,
 	}
 
-	st := state.NewStatusState(constant.Inital)
+	st := state.NewStatusState(constant.Initial)
 	if st.FSM.Cannot(request.Status.String()) {
 		errorStatus := fmt.Errorf("%w from %s to %s",
 			errorGeneral.ErrInvalidStatusTransition,

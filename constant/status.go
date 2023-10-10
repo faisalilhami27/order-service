@@ -4,7 +4,7 @@ type OrderStatus int
 type OrderStatusString string
 
 const (
-	Inital         OrderStatus = 0
+	Initial        OrderStatus = 0
 	Pending        OrderStatus = 100
 	PendingPayment OrderStatus = 200
 	PaymentSuccess OrderStatus = 300
@@ -20,7 +20,7 @@ const (
 )
 
 var mapOrderStatusIntToString = map[OrderStatus]OrderStatusString{
-	Inital:         InitialString,
+	Initial:        InitialString,
 	Pending:        PendingString,
 	PendingPayment: PendingPaymentString,
 	PaymentSuccess: PaymentSuccessString,
@@ -29,7 +29,7 @@ var mapOrderStatusIntToString = map[OrderStatus]OrderStatusString{
 }
 
 var mapOrderStatusStringToInt = map[OrderStatusString]OrderStatus{
-	InitialString:        Inital,
+	InitialString:        Initial,
 	PendingString:        Pending,
 	PendingPaymentString: PendingPayment,
 	PaymentSuccessString: PaymentSuccess,
