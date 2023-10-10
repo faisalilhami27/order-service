@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	errOrder "order-service/constant/error/order"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -25,13 +26,29 @@ type IOrder struct {
 
 type IOrderRepository interface {
 	Create(context.Context, *gorm.DB, *orderDTO.OrderRequest) (*orderModel.Order, error)
-	FindOneOrderByCustomerIDWithLocking(ctx context.Context, customerID uuid.UUID) (*orderModel.Order, error)
+	FindOneOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*orderModel.Order, error)
+	FindOneByUUID(context.Context, string) (*orderModel.Order, error)
 }
 
 func NewOrder(db *gorm.DB) IOrderRepository {
 	return &IOrder{
 		db: db,
 	}
+}
+
+func (o *IOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*orderModel.Order, error) {
+	var order orderModel.Order
+	err := o.db.WithContext(ctx).
+		Preload("Payment").
+		Where("uuid = ?", orderUUID).
+		First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errOrder.ErrOrderNotFound
+		}
+		return nil, err
+	}
+	return &order, nil
 }
 
 func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
@@ -57,8 +74,6 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 
 func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.OrderRequest) (*orderModel.Order, error) {
 	isPaid := false
-	location, _ := time.LoadLocation("Asia/Jakarta") //nolint:errcheck
-	datetime := time.Now().In(location)
 	orderName, err := o.autoNumber(ctx)
 	if err != nil {
 		return nil, err
@@ -73,8 +88,6 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		OrderDate:  request.OrderDate,
 		Status:     request.Status,
 		IsPaid:     &isPaid,
-		CreatedAt:  &datetime,
-		UpdatedAt:  &datetime,
 	}
 
 	st := state.NewStatusState(constant.Inital)

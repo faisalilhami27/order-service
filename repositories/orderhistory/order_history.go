@@ -18,7 +18,7 @@ type IOrderHistoryRepository interface {
 	Create(context.Context, *gorm.DB, *orderHistoryDTO.OrderHistoryRequest) error
 }
 
-func NewOrder(db *gorm.DB) IOrderHistoryRepository {
+func NewOrderHistory(db *gorm.DB) IOrderHistoryRepository {
 	return &IOrderHistory{
 		db: db,
 	}

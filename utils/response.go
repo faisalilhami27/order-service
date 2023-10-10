@@ -13,7 +13,7 @@ type Response struct {
 func ResponseSuccess(data interface{}) Response {
 	return Response{
 		Status:  constant.Success,
-		Message: constant.Success,
+		Message: "OK",
 		Data:    data,
 	}
 }

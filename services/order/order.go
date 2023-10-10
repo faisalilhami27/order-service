@@ -2,6 +2,8 @@ package order
 
 import (
 	"context"
+	orderPaymentDTO "order-service/domain/dto/orderpayment"
+	orderPaymentModel "order-service/domain/models/orderpayment"
 
 	"gorm.io/gorm"
 
@@ -31,9 +33,9 @@ func NewOrderService(repository repositories.IRepositoryRegistry) IOrderService 
 
 func (o *IOrder) CreateOrder(ctx context.Context, request *orderDTO.OrderRequest) (*orderDTO.OrderResponse, error) {
 	var (
-		orderResult *orderModel.Order
-		order       *orderModel.Order
-		txErr       error
+		orderResult, order *orderModel.Order
+		orderPayment       *orderPaymentModel.OrderPayment
+		txErr              error
 	)
 
 	tx := o.repository.GetTx()
@@ -61,6 +63,20 @@ func (o *IOrder) CreateOrder(ctx context.Context, request *orderDTO.OrderRequest
 		if txErr != nil {
 			return txErr
 		}
+
+		// Should! will continue if invoice and payment service is ready
+		status := "pending"
+		orderPayment, txErr = o.repository.GetOrderPaymentRepository().
+			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
+				OrderID:    orderResult.ID,
+				PaymentID:  uuid.New(),
+				InvoiceID:  uuid.New(),
+				PaymentURL: "https://payment.com",
+				Status:     &status,
+			})
+		if txErr != nil {
+			return txErr
+		}
 		return nil
 	})
 
@@ -68,6 +84,11 @@ func (o *IOrder) CreateOrder(ctx context.Context, request *orderDTO.OrderRequest
 		return nil, err
 	}
 
-	response := orderDTO.ResponseFormatter(orderResult)
+	response := orderDTO.ResponseFormatter(orderResult, &orderPaymentDTO.OrderPaymentResponse{
+		PaymentID:  orderPayment.PaymentID,
+		InvoiceID:  orderPayment.InvoiceID,
+		PaymentURL: orderPayment.PaymentURL,
+		Status:     orderPayment.Status,
+	})
 	return response, nil
 }

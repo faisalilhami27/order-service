@@ -5,6 +5,6 @@ import (
 )
 
 type OrderHistoryRequest struct { //nolint:revive
-	OrderID int64                      `json:"order_id"`
+	OrderID uint                       `json:"order_id"`
 	Status  constant.OrderStatusString `json:"status"`
 }

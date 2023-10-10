@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 
 	"order-service/constant"
+	orderPaymentDTO "order-service/domain/dto/orderpayment"
 	orderModel "order-service/domain/models/order"
 
 	"time"
@@ -19,21 +20,22 @@ type OrderRequest struct { //nolint:revive
 }
 
 type OrderResponse struct { //nolint:revive
-	UUID        uuid.UUID            `json:"orderID"`
-	OrderName   string               `json:"orderName"`
-	CustomerID  string               `json:"customerID"`
-	PackageID   string               `json:"packageID"`
-	Amount      float64              `json:"amount"`
-	Status      constant.OrderStatus `json:"status"`
-	OrderDate   time.Time            `json:"orderDate"`
-	IsPaid      *bool                `json:"IsPaid"`
-	CompletedAt *time.Time           `json:"completedAt"`
-	CanceledAt  *time.Time           `json:"canceledAt"`
-	CreatedAt   *time.Time           `json:"createdAt"`
-	UpdatedAt   *time.Time           `json:"updatedAt"`
+	UUID        uuid.UUID                             `json:"orderID"`
+	OrderName   string                                `json:"orderName"`
+	CustomerID  string                                `json:"customerID"`
+	PackageID   string                                `json:"packageID"`
+	Amount      float64                               `json:"amount"`
+	Status      constant.OrderStatus                  `json:"status"`
+	OrderDate   time.Time                             `json:"orderDate"`
+	IsPaid      *bool                                 `json:"isPaid"`
+	CompletedAt *time.Time                            `json:"completedAt"`
+	CanceledAt  *time.Time                            `json:"canceledAt"`
+	CreatedAt   *time.Time                            `json:"createdAt"`
+	UpdatedAt   *time.Time                            `json:"updatedAt"`
+	Payment     *orderPaymentDTO.OrderPaymentResponse `json:"payment"`
 }
 
-func ResponseFormatter(order *orderModel.Order) *OrderResponse {
+func ResponseFormatter(order *orderModel.Order, payment *orderPaymentDTO.OrderPaymentResponse) *OrderResponse {
 	return &OrderResponse{
 		UUID:        order.UUID,
 		OrderName:   order.OrderName,
@@ -47,5 +49,6 @@ func ResponseFormatter(order *orderModel.Order) *OrderResponse {
 		CanceledAt:  order.CanceledAt,
 		CreatedAt:   order.CreatedAt,
 		UpdatedAt:   order.UpdatedAt,
+		Payment:     payment,
 	}
 }

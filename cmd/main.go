@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	orderPaymentModel "order-service/domain/models/orderpayment"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -40,6 +41,7 @@ var restCmd = &cobra.Command{
 		err = db.AutoMigrate(
 			&orderModel.Order{},
 			&orderHistoryModel.OrderHistory{},
+			&orderPaymentModel.OrderPayment{},
 		)
 		if err != nil {
 			panic(err)
