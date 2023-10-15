@@ -29,6 +29,7 @@ type IOrderRepository interface {
 	FindOneOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*orderModel.Order, error)
 	FindOneByUUID(context.Context, string) (*orderModel.Order, error)
 	FindAllWithPagination(context.Context, *orderDTO.OrderRequestParam) ([]orderModel.Order, int64, error)
+	Cancel(context.Context, *gorm.DB, *orderDTO.CancelRequest, *orderModel.Order) error
 }
 
 func NewOrder(db *gorm.DB) IOrderRepository {
@@ -51,7 +52,7 @@ func (o *IOrder) FindAllWithPagination(
 		Preload("Payment").
 		Limit(limit).
 		Offset(offset).
-		First(&order).Error
+		Find(&order).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, 0, errOrder.ErrOrderNotFound
@@ -137,6 +138,42 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 	return &order, nil
+}
+
+func (o *IOrder) Cancel(
+	ctx context.Context,
+	tx *gorm.DB,
+	request *orderDTO.CancelRequest,
+	current *orderModel.Order,
+) error {
+	var (
+		canceledAt = time.Now()
+		order      orderModel.Order
+	)
+	order = orderModel.Order{
+		CanceledAt: &canceledAt,
+	}
+
+	st := state.NewStatusState(current.Status)
+	if st.FSM.Cannot(request.Status.String()) {
+		errorStatus := fmt.Errorf("%w from %s to %s",
+			errorGeneral.ErrInvalidStatusTransition,
+			st.FSM.Current(),
+			request.Status.String())
+		return errorStatus
+	}
+
+	err := tx.WithContext(ctx).
+		Model(&order).
+		Where("uuid = ?", request.UUID).
+		Updates(orderModel.Order{
+			Status:     constant.Cancelled,
+			CanceledAt: &canceledAt,
+		}).Error
+	if err != nil {
+		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return nil
 }
 
 func (o *IOrder) autoNumber(ctx context.Context) (*string, error) {

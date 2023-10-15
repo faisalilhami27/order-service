@@ -17,6 +17,7 @@ type IOrderController interface {
 	CreateOrder(c *gin.Context)
 	GetOrderList(c *gin.Context)
 	GetOrderDetail(c *gin.Context)
+	CancelOrder(c *gin.Context)
 }
 
 type IOrder struct {
@@ -91,4 +92,19 @@ func (o *IOrder) GetOrderDetail(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response.ResponseSuccess(order))
+}
+
+func (o *IOrder) CancelOrder(c *gin.Context) {
+	var (
+		ctx       = c.Request.Context()
+		orderUUID = c.Param("uuid")
+	)
+
+	err := o.serviceRegistry.GetOrder().Cancel(ctx, orderUUID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.ResponseSuccess(nil))
 }

@@ -29,5 +29,6 @@ func (o *OrderRoute) Run() {
 	group := o.route.Group("/order")
 	group.GET("", o.controller.GetOrder().GetOrderList)
 	group.GET("/:uuid", o.controller.GetOrder().GetOrderDetail)
+	group.POST("/:uuid", o.controller.GetOrder().CancelOrder)
 	group.POST("", o.controller.GetOrder().CreateOrder)
 }

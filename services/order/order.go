@@ -24,6 +24,7 @@ type IOrder struct {
 
 type IOrderService interface {
 	CreateOrder(context.Context, *orderDTO.OrderRequest) (*orderDTO.OrderResponse, error)
+	Cancel(context.Context, string) error
 	GetOrderList(context.Context, *orderDTO.OrderRequestParam) (*helper.PaginationResult, error)
 	GetOrderDetail(context.Context, string) (*orderDTO.OrderResponse, error)
 }
@@ -159,4 +160,50 @@ func (o *IOrder) CreateOrder(ctx context.Context, request *orderDTO.OrderRequest
 		Status:     orderPayment.Status,
 	})
 	return response, nil
+}
+
+func (o *IOrder) Cancel(ctx context.Context, orderUUID string) error {
+	var (
+		order *orderModel.Order
+		txErr error
+	)
+
+	tx := o.repository.GetTx()
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		order, txErr = o.repository.GetOrderRepository().FindOneByUUID(ctx, orderUUID)
+		if txErr != nil {
+			return txErr
+		}
+
+		if order != nil && order.Status == constant.Cancelled {
+			return errOrder.ErrCancelOrder
+		}
+
+		uuid, _ := uuid.Parse(orderUUID) //nolint:errcheck
+		txErr = o.repository.GetOrderRepository().Cancel(ctx, tx, &orderDTO.CancelRequest{
+			UUID:   uuid,
+			Status: constant.Cancelled,
+		}, &orderModel.Order{
+			Status: order.Status,
+		})
+		if txErr != nil {
+			return txErr
+		}
+
+		txErr = o.repository.GetOrderHistoryRepository().Create(ctx, tx, &orderHistoryDTO.OrderHistoryRequest{
+			OrderID: order.ID,
+			Status:  constant.CancelledString,
+		})
+		if txErr != nil {
+			return txErr
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

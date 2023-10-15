@@ -11,12 +11,17 @@ import (
 )
 
 type OrderRequest struct { //nolint:revive
-	CustomerID string               `json:"customer_id"`
-	PackageID  string               `json:"package_id"`
-	Amount     float64              `json:"amount"`
-	OrderDate  time.Time            `json:"order_date"`
+	CustomerID string               `json:"customerID" validate:"required"`
+	PackageID  string               `json:"packageID" validate:"required"`
+	Amount     float64              `json:"amount" validate:"required"`
+	OrderDate  time.Time            `json:"orderDate" validate:"required"`
 	Status     constant.OrderStatus `json:"status"`
-	IsPaid     *bool                `json:"is_paid"`
+	IsPaid     *bool                `json:"isPaid"`
+}
+
+type CancelRequest struct {
+	UUID   uuid.UUID            `json:"uuid,omitempty"`
+	Status constant.OrderStatus `json:"status"`
 }
 
 type OrderRequestParam struct { //nolint:revive
