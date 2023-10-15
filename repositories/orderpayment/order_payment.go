@@ -6,8 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
+	errorGeneral "order-service/constant/error"
 	orderPaymentDTO "order-service/domain/dto/orderpayment"
 	orderPaymentModel "order-service/domain/models/orderpayment"
+	errorHelper "order-service/utils/error"
 )
 
 type IOrderPayment struct {
@@ -43,7 +45,7 @@ func (o *IOrderPayment) Create(
 	}
 	err := tx.WithContext(ctx).Create(&orderPayment).Error
 	if err != nil {
-		return nil, err
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 	return &orderPayment, nil
 }

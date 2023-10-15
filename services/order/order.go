@@ -4,7 +4,7 @@ import (
 	"context"
 	orderPaymentDTO "order-service/domain/dto/orderpayment"
 	orderPaymentModel "order-service/domain/models/orderpayment"
-	"order-service/utils"
+	"order-service/utils/helper"
 
 	"gorm.io/gorm"
 
@@ -24,7 +24,8 @@ type IOrder struct {
 
 type IOrderService interface {
 	CreateOrder(context.Context, *orderDTO.OrderRequest) (*orderDTO.OrderResponse, error)
-	GetOrderList(context.Context, *orderDTO.OrderRequestParam) (*utils.PaginationResult, error)
+	GetOrderList(context.Context, *orderDTO.OrderRequestParam) (*helper.PaginationResult, error)
+	GetOrderDetail(context.Context, string) (*orderDTO.OrderResponse, error)
 }
 
 func NewOrderService(repository repositories.IRepositoryRegistry) IOrderService {
@@ -36,7 +37,7 @@ func NewOrderService(repository repositories.IRepositoryRegistry) IOrderService 
 func (o *IOrder) GetOrderList(
 	ctx context.Context,
 	request *orderDTO.OrderRequestParam,
-) (*utils.PaginationResult, error) {
+) (*helper.PaginationResult, error) {
 	var (
 		orders []orderModel.Order
 		total  int64
@@ -69,14 +70,33 @@ func (o *IOrder) GetOrderList(
 		})
 	}
 
-	pagination := utils.PaginationParam{
+	pagination := helper.PaginationParam{
 		Count: total,
 		Page:  request.Page,
 		Limit: request.Limit,
 		Data:  orderResponses,
 	}
-	response := utils.GeneratePagination(pagination)
+	response := helper.GeneratePagination(pagination)
 	return &response, nil
+}
+
+func (o *IOrder) GetOrderDetail(ctx context.Context, orderUUID string) (*orderDTO.OrderResponse, error) {
+	var (
+		order *orderModel.Order
+	)
+
+	order, err := o.repository.GetOrderRepository().FindOneByUUID(ctx, orderUUID)
+	if err != nil {
+		return nil, err
+	}
+
+	response := orderDTO.ResponseFormatter(order, &orderPaymentDTO.OrderPaymentResponse{
+		PaymentID:  order.Payment.PaymentID,
+		InvoiceID:  order.Payment.InvoiceID,
+		PaymentURL: order.Payment.PaymentURL,
+		Status:     order.Payment.Status,
+	})
+	return response, nil
 }
 
 func (o *IOrder) CreateOrder(ctx context.Context, request *orderDTO.OrderRequest) (*orderDTO.OrderResponse, error) {

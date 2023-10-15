@@ -1,17 +1,19 @@
-package utils
+package response
 
 import (
 	"net/http"
 	constant "order-service/constant/error"
+	errorValidation "order-service/utils/error"
 )
 
 type Response struct {
-	Status  string               `json:"status"`
-	Message string               `json:"message"`
-	Data    interface{}          `json:"data,omitempty"`
-	Error   []ValidationResponse `json:"error,omitempty"`
+	Status  string                               `json:"status"`
+	Message string                               `json:"message"`
+	Data    interface{}                          `json:"data,omitempty"`
+	Error   []errorValidation.ValidationResponse `json:"error,omitempty"`
 }
 
+//nolint:revive
 func ResponseSuccess(data interface{}) Response {
 	return Response{
 		Status:  constant.Success,
@@ -20,6 +22,7 @@ func ResponseSuccess(data interface{}) Response {
 	}
 }
 
+//nolint:revive
 func ResponseError(err error) Response {
 	return Response{
 		Status:  constant.Error,
@@ -27,7 +30,8 @@ func ResponseError(err error) Response {
 	}
 }
 
-func ResponseErrorValidation(response []ValidationResponse) Response {
+//nolint:revive
+func ResponseErrorValidation(response []errorValidation.ValidationResponse) Response {
 	return Response{
 		Status:  constant.Error,
 		Message: http.StatusText(http.StatusUnprocessableEntity),

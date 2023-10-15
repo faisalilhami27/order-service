@@ -3,10 +3,10 @@ package config
 import (
 	"github.com/spf13/viper"
 
+	"order-service/utils/helper"
+
 	"log"
 	"os"
-
-	"order-service/utils"
 )
 
 var Config AppConfig
@@ -33,10 +33,10 @@ type Database struct {
 }
 
 func Init() {
-	err := utils.BindFromJSON(&Config, "config.json", ".")
+	err := helper.BindFromJSON(&Config, "config.json", ".")
 	if err != nil {
 		log.Printf("failed load cold config from file: %s", viper.ConfigFileUsed())
-		err = utils.BindFromConsul(&Config, os.Getenv("CONSUL_HTTP_URL"), os.Getenv("CONSUL_HTTP_KEY"))
+		err = helper.BindFromConsul(&Config, os.Getenv("CONSUL_HTTP_URL"), os.Getenv("CONSUL_HTTP_KEY"))
 		if err != nil {
 			panic(err)
 		}

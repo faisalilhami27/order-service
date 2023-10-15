@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	errOrder "order-service/constant/error/order"
+	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -13,11 +14,10 @@ import (
 	"order-service/common/state"
 	"order-service/constant"
 	errorGeneral "order-service/constant/error"
+	errOrder "order-service/constant/error/order"
 	orderDTO "order-service/domain/dto/order"
 	orderModel "order-service/domain/models/order"
-
-	"strconv"
-	"time"
+	errorHelper "order-service/utils/error"
 )
 
 type IOrder struct {
@@ -56,14 +56,14 @@ func (o *IOrder) FindAllWithPagination(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, 0, errOrder.ErrOrderNotFound
 		}
-		return nil, 0, err
+		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 
 	err = o.db.WithContext(ctx).
 		Model(&order).
 		Count(&total).Error
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 
 	return order, total, nil
@@ -79,7 +79,7 @@ func (o *IOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*orderMod
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errOrder.ErrOrderNotFound
 		}
-		return nil, err
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 	return &order, nil
 }
@@ -100,7 +100,7 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, err
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 	return &order, nil
 }
@@ -134,7 +134,7 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 
 	err = tx.WithContext(ctx).Create(&order).Error
 	if err != nil {
-		return nil, err
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 	return &order, nil
 }
@@ -148,7 +148,7 @@ func (o *IOrder) autoNumber(ctx context.Context) (*string, error) {
 	err := o.db.WithContext(ctx).Order("id desc").First(&order).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
+			return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
 		}
 	}
 

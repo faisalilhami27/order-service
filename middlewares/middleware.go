@@ -4,9 +4,9 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
-	"net/http"
+	"order-service/utils/response"
 
-	"order-service/utils"
+	"net/http"
 )
 
 func HandlePanic(c *gin.Context) {
@@ -14,7 +14,7 @@ func HandlePanic(c *gin.Context) {
 		if r := recover(); r != nil {
 			log.SetLevel(log.ErrorLevel)
 			log.Errorf("error occured: %v", r)
-			c.JSON(http.StatusBadRequest, utils.ResponseError(r.(error))) //nolint:forcetypeassert
+			c.JSON(http.StatusBadRequest, response.ResponseError(r.(error))) //nolint:forcetypeassert
 			return
 		}
 	}()

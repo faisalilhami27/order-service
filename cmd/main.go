@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	orderPaymentModel "order-service/domain/models/orderpayment"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -12,12 +12,11 @@ import (
 	controllerRegistry "order-service/controllers"
 	orderModel "order-service/domain/models/order"
 	orderHistoryModel "order-service/domain/models/orderhistory"
+	orderPaymentModel "order-service/domain/models/orderpayment"
 	"order-service/migrations"
 	repositoryRegistry "order-service/repositories"
 	routeRegistry "order-service/routes"
 	serviceRegistry "order-service/services"
-
-	"time"
 )
 
 var restCmd = &cobra.Command{
@@ -37,6 +36,14 @@ var restCmd = &cobra.Command{
 		}
 		time.Local = loc
 
+		// Database Auto Migration other than model
+		if config.Config.Database.AutoMigrate {
+			err = migrations.Run()
+			if err != nil {
+				panic(err)
+			}
+		}
+
 		// Database Auto Migration from model
 		err = db.AutoMigrate(
 			&orderModel.Order{},
@@ -47,19 +54,17 @@ var restCmd = &cobra.Command{
 			panic(err)
 		}
 
-		// Database Auto Migration other than model
-		if config.Config.Database.AutoMigrate {
-			err = migrations.Run()
-			if err != nil {
-				panic(err)
-			}
-		}
-
 		repository := repositoryRegistry.NewRepositoryRegistry(db)
 		service := serviceRegistry.NewServiceRegistry(repository)
 		controller := controllerRegistry.NewControllerRegistry(service)
 
 		router := gin.Default()
+		router.Use(func(c *gin.Context) {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH")
+			c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			c.Next()
+		})
 		group := router.Group("/api/v1")
 		route := routeRegistry.NewRouteRegistry(controller, group)
 		route.Serve()

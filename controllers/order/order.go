@@ -4,16 +4,19 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 
+	errorValidation "order-service/utils/error"
+	"order-service/utils/response"
+
 	"net/http"
 
 	orderDTO "order-service/domain/dto/order"
 	"order-service/services"
-	"order-service/utils"
 )
 
 type IOrderController interface {
 	CreateOrder(c *gin.Context)
 	GetOrderList(c *gin.Context)
+	GetOrderDetail(c *gin.Context)
 }
 
 type IOrder struct {
@@ -34,17 +37,17 @@ func (o *IOrder) CreateOrder(c *gin.Context) {
 
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, utils.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
 	}
 
 	order, err := o.serviceRegistry.GetOrder().CreateOrder(ctx, &request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, utils.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
 	}
 
-	c.JSON(http.StatusOK, utils.ResponseSuccess(order))
+	c.JSON(http.StatusOK, response.ResponseSuccess(order))
 }
 
 func (o *IOrder) GetOrderList(c *gin.Context) {
@@ -55,22 +58,37 @@ func (o *IOrder) GetOrderList(c *gin.Context) {
 
 	err := c.ShouldBindQuery(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, utils.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
 	}
 
 	validate := validator.New()
 	if err := validate.Struct(request); err != nil {
-		errorResponse := utils.ErrorResponse(err)
-		c.JSON(http.StatusUnprocessableEntity, utils.ResponseErrorValidation(errorResponse))
+		errorResponse := errorValidation.ErrorValidationResponse(err)
+		c.JSON(http.StatusUnprocessableEntity, response.ResponseErrorValidation(errorResponse))
 		return
 	}
 
 	order, err := o.serviceRegistry.GetOrder().GetOrderList(ctx, &request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, utils.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
 	}
 
-	c.JSON(http.StatusOK, utils.ResponseSuccess(order))
+	c.JSON(http.StatusOK, response.ResponseSuccess(order))
+}
+
+func (o *IOrder) GetOrderDetail(c *gin.Context) {
+	var (
+		ctx       = c.Request.Context()
+		orderUUID = c.Param("uuid")
+	)
+
+	order, err := o.serviceRegistry.GetOrder().GetOrderDetail(ctx, orderUUID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.ResponseSuccess(order))
 }

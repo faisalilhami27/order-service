@@ -9,4 +9,5 @@ const (
 
 var (
 	ErrInvalidStatusTransition = errors.New("invalid status transition")
+	ErrSQLError                = errors.New("error sql")
 )

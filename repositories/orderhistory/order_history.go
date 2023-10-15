@@ -6,8 +6,10 @@ import (
 
 	"gorm.io/gorm"
 
+	errorGeneral "order-service/constant/error"
 	orderHistoryDTO "order-service/domain/dto/orderhistory"
 	orderHistoryModel "order-service/domain/models/orderhistory"
+	errorHelper "order-service/utils/error"
 )
 
 type IOrderHistory struct {
@@ -36,7 +38,7 @@ func (o *IOrderHistory) Create(ctx context.Context, tx *gorm.DB, request *orderH
 	}
 	err := tx.WithContext(ctx).Create(&orderHistory).Error
 	if err != nil {
-		return err
+		return errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}
 	return nil
 }
