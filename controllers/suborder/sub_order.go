@@ -1,4 +1,4 @@
-package order
+package controllers
 
 import (
 	"github.com/gin-gonic/gin"
@@ -9,31 +9,31 @@ import (
 
 	"net/http"
 
-	orderDTO "order-service/domain/dto/order"
+	orderDTO "order-service/domain/dto/suborder"
 	"order-service/services"
 )
 
-type IOrderController interface {
+type ISubOrderController interface {
 	CreateOrder(c *gin.Context)
-	GetOrderList(c *gin.Context)
-	GetOrderDetail(c *gin.Context)
+	GetSubOrderList(c *gin.Context)
+	GetSubOrderDetail(c *gin.Context)
 	CancelOrder(c *gin.Context)
 }
 
-type IOrder struct {
+type ISubOrder struct {
 	serviceRegistry services.IServiceRegistry
 }
 
-func NewOrderController(serviceRegistry services.IServiceRegistry) IOrderController {
-	return &IOrder{
+func NewOrderController(serviceRegistry services.IServiceRegistry) ISubOrderController {
+	return &ISubOrder{
 		serviceRegistry: serviceRegistry,
 	}
 }
 
-func (o *IOrder) CreateOrder(c *gin.Context) {
+func (o *ISubOrder) CreateOrder(c *gin.Context) {
 	var (
 		ctx     = c.Request.Context()
-		request = orderDTO.OrderRequest{}
+		request = orderDTO.SubOrderRequest{}
 	)
 
 	err := c.ShouldBindJSON(&request)
@@ -42,7 +42,14 @@ func (o *IOrder) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	order, err := o.serviceRegistry.GetOrder().CreateOrder(ctx, &request)
+	validate := validator.New()
+	if err := validate.Struct(request); err != nil {
+		errorResponse := errorValidation.ErrorValidationResponse(err)
+		c.JSON(http.StatusUnprocessableEntity, response.ResponseErrorValidation(errorResponse))
+		return
+	}
+
+	order, err := o.serviceRegistry.GetSubOrder().CreateOrder(ctx, &request)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
@@ -51,10 +58,10 @@ func (o *IOrder) CreateOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, response.ResponseSuccess(order))
 }
 
-func (o *IOrder) GetOrderList(c *gin.Context) {
+func (o *ISubOrder) GetSubOrderList(c *gin.Context) {
 	var (
 		ctx     = c.Request.Context()
-		request = orderDTO.OrderRequestParam{}
+		request = orderDTO.SubOrderRequestParam{}
 	)
 
 	err := c.ShouldBindQuery(&request)
@@ -70,7 +77,7 @@ func (o *IOrder) GetOrderList(c *gin.Context) {
 		return
 	}
 
-	order, err := o.serviceRegistry.GetOrder().GetOrderList(ctx, &request)
+	order, err := o.serviceRegistry.GetSubOrder().GetSubOrderList(ctx, &request)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
@@ -79,13 +86,13 @@ func (o *IOrder) GetOrderList(c *gin.Context) {
 	c.JSON(http.StatusOK, response.ResponseSuccess(order))
 }
 
-func (o *IOrder) GetOrderDetail(c *gin.Context) {
+func (o *ISubOrder) GetSubOrderDetail(c *gin.Context) {
 	var (
 		ctx       = c.Request.Context()
 		orderUUID = c.Param("uuid")
 	)
 
-	order, err := o.serviceRegistry.GetOrder().GetOrderDetail(ctx, orderUUID)
+	order, err := o.serviceRegistry.GetSubOrder().GetOrderDetail(ctx, orderUUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return
@@ -94,13 +101,13 @@ func (o *IOrder) GetOrderDetail(c *gin.Context) {
 	c.JSON(http.StatusOK, response.ResponseSuccess(order))
 }
 
-func (o *IOrder) CancelOrder(c *gin.Context) {
+func (o *ISubOrder) CancelOrder(c *gin.Context) {
 	var (
 		ctx       = c.Request.Context()
 		orderUUID = c.Param("uuid")
 	)
 
-	err := o.serviceRegistry.GetOrder().Cancel(ctx, orderUUID)
+	err := o.serviceRegistry.GetSubOrder().Cancel(ctx, orderUUID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.ResponseError(err))
 		return

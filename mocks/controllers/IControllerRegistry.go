@@ -3,7 +3,7 @@
 package mocks
 
 import (
-	order "order-service/controllers/order"
+	controllers "order-service/controllers/suborder"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -13,16 +13,16 @@ type IControllerRegistry struct {
 	mock.Mock
 }
 
-// GetOrder provides a mock function with given fields:
-func (_m *IControllerRegistry) GetOrder() order.IOrderController {
+// GetSubOrder provides a mock function with given fields:
+func (_m *IControllerRegistry) GetSubOrder() controllers.ISubOrderController {
 	ret := _m.Called()
 
-	var r0 order.IOrderController
-	if rf, ok := ret.Get(0).(func() order.IOrderController); ok {
+	var r0 controllers.ISubOrderController
+	if rf, ok := ret.Get(0).(func() controllers.ISubOrderController); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(order.IOrderController)
+			r0 = ret.Get(0).(controllers.ISubOrderController)
 		}
 	}
 

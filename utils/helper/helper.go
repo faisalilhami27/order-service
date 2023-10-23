@@ -1,6 +1,9 @@
 package helper
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -141,4 +144,12 @@ func SetEnvFromConsulKV(v *viper.Viper) error {
 	}
 
 	return nil
+}
+
+func GenerateSHA256(inputString string) string {
+	hash := sha256.New()
+	hash.Write([]byte(inputString))
+	hashBytes := hash.Sum(nil)
+	hashString := hex.EncodeToString(hashBytes)
+	return hashString
 }

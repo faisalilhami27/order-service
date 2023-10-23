@@ -1,4 +1,4 @@
-package orderpayment
+package models
 
 import (
 	"github.com/google/uuid"
@@ -8,7 +8,7 @@ import (
 
 type OrderPayment struct {
 	ID         uint `gorm:"primaryKey;autoIncrement"`
-	OrderID    uint
+	SubOrderID uint
 	PaymentID  uuid.UUID
 	InvoiceID  uuid.UUID
 	PaymentURL string

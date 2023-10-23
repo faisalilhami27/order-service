@@ -5,14 +5,14 @@ import (
 
 	"order-service/controllers"
 	"order-service/middlewares"
-	"order-service/routes/order"
+	subOrderRoute "order-service/routes/suborder"
 )
 
 type IRouteRegistry interface {
 	Serve()
 }
 
-type RouteService struct {
+type Route struct {
 	controller controllers.IControllerRegistry
 	Route      *gin.RouterGroup
 }
@@ -21,17 +21,17 @@ func NewRouteRegistry(
 	controller controllers.IControllerRegistry,
 	route *gin.RouterGroup,
 ) IRouteRegistry {
-	return &RouteService{
+	return &Route{
 		controller: controller,
 		Route:      route,
 	}
 }
 
-func (r *RouteService) Serve() {
+func (r *Route) Serve() {
 	r.Route.Use(middlewares.HandlePanic)
-	r.orderRoute().Run()
+	r.suOrderRoute().Run()
 }
 
-func (r *RouteService) orderRoute() order.IOrderRoute {
-	return order.NewOrderRoute(r.controller, r.Route)
+func (r *Route) suOrderRoute() subOrderRoute.ISubOrderRoute {
+	return subOrderRoute.NewSubOrderRoute(r.controller, r.Route)
 }

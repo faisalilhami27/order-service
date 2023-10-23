@@ -12,11 +12,12 @@ import (
 var Config AppConfig
 
 type AppConfig struct {
-	Port         int      `json:"port" yaml:"port"`
-	AppName      string   `json:"appName" yaml:"appName"`
-	AppEnv       string   `json:"appEnv" yaml:"appEnv"`
-	SignatureKey string   `json:"signatureKey" yaml:"signatureKey"`
-	Database     Database `json:"database" yaml:"database"`
+	Port            int             `json:"port" yaml:"port"`
+	AppName         string          `json:"appName" yaml:"appName"`
+	AppEnv          string          `json:"appEnv" yaml:"appEnv"`
+	SignatureKey    string          `json:"signatureKey" yaml:"signatureKey"`
+	Database        Database        `json:"database" yaml:"database"`
+	InternalService InternalService `json:"internalService" yaml:"internalService"`
 }
 
 type Database struct {
@@ -30,6 +31,15 @@ type Database struct {
 	MaxIdleConnection     int    `json:"maxIdleConnection" yaml:"maxIdleConnection"`
 	MaxIdleTime           int    `json:"maxIdleTime" yaml:"maxIdleTime"`
 	AutoMigrate           bool   `json:"autoMigrate" yaml:"autoMigrate"`
+}
+
+type InternalService struct {
+	Payment Payment `json:"payment" yaml:"payment"`
+}
+
+type Payment struct {
+	Host      string `json:"host" yaml:"host"`
+	SecretKey string `json:"secret_key" yaml:"secretKey"`
 }
 
 func Init() {

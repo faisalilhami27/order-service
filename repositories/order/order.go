@@ -1,4 +1,4 @@
-package order
+package repositories
 
 import (
 	"context"
@@ -8,13 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"order-service/common/state"
-	"order-service/constant"
 	errorGeneral "order-service/constant/error"
-	errOrder "order-service/constant/error/order"
 	orderDTO "order-service/domain/dto/order"
 	orderModel "order-service/domain/models/order"
 	errorHelper "order-service/utils/error"
@@ -26,10 +24,8 @@ type IOrder struct {
 
 type IOrderRepository interface {
 	Create(context.Context, *gorm.DB, *orderDTO.OrderRequest) (*orderModel.Order, error)
+	DeleteByOrderID(context.Context, uint) error
 	FindOneOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*orderModel.Order, error)
-	FindOneByUUID(context.Context, string) (*orderModel.Order, error)
-	FindAllWithPagination(context.Context, *orderDTO.OrderRequestParam) ([]orderModel.Order, int64, error)
-	Cancel(context.Context, *gorm.DB, *orderDTO.CancelRequest, *orderModel.Order) error
 }
 
 func NewOrder(db *gorm.DB) IOrderRepository {
@@ -38,62 +34,14 @@ func NewOrder(db *gorm.DB) IOrderRepository {
 	}
 }
 
-func (o *IOrder) FindAllWithPagination(
-	ctx context.Context,
-	request *orderDTO.OrderRequestParam,
-) ([]orderModel.Order, int64, error) {
-	var (
-		order []orderModel.Order
-		total int64
-	)
-	limit := request.Limit
-	offset := (request.Page - 1) * limit
-	err := o.db.WithContext(ctx).
-		Preload("Payment").
-		Limit(limit).
-		Offset(offset).
-		Find(&order).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, 0, errOrder.ErrOrderNotFound
-		}
-		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError)
-	}
-
-	err = o.db.WithContext(ctx).
-		Model(&order).
-		Count(&total).Error
-	if err != nil {
-		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError)
-	}
-
-	return order, total, nil
-}
-
-func (o *IOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*orderModel.Order, error) {
-	var order orderModel.Order
-	err := o.db.WithContext(ctx).
-		Preload("Payment").
-		Where("uuid = ?", orderUUID).
-		First(&order).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errOrder.ErrOrderNotFound
-		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
-	}
-	return &order, nil
-}
-
 func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 	ctx context.Context,
 	customerID uuid.UUID,
 ) (*orderModel.Order, error) {
 	var order orderModel.Order
 	err := o.db.WithContext(ctx).
+		Preload("SubOrder", "completed_at IS NULL AND canceled_at IS NULL").
 		Where("customer_id = ?", customerID).
-		Where("completed_at IS NULL").
-		Where("canceled_at IS NULL").
 		Order("id DESC").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		First(&order).Error
@@ -107,7 +55,8 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 }
 
 func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.OrderRequest) (*orderModel.Order, error) {
-	isPaid := false
+	location, _ := time.LoadLocation("Asia/Jakarta") //nolint:errcheck
+	datetime := time.Now().In(location)
 	orderName, err := o.autoNumber(ctx)
 	if err != nil {
 		return nil, err
@@ -118,21 +67,9 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		OrderName:  *orderName,
 		CustomerID: request.CustomerID,
 		PackageID:  request.PackageID,
-		Amount:     request.Amount,
-		OrderDate:  request.OrderDate,
-		Status:     request.Status,
-		IsPaid:     &isPaid,
+		CreatedAt:  &datetime,
+		UpdatedAt:  &datetime,
 	}
-
-	st := state.NewStatusState(constant.Initial)
-	if st.FSM.Cannot(request.Status.String()) {
-		errorStatus := fmt.Errorf("%w from %s to %s",
-			errorGeneral.ErrInvalidStatusTransition,
-			st.FSM.Current(),
-			request.Status.String())
-		return nil, errorStatus
-	}
-
 	err = tx.WithContext(ctx).Create(&order).Error
 	if err != nil {
 		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
@@ -140,36 +77,10 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 	return &order, nil
 }
 
-func (o *IOrder) Cancel(
-	ctx context.Context,
-	tx *gorm.DB,
-	request *orderDTO.CancelRequest,
-	current *orderModel.Order,
-) error {
-	var (
-		canceledAt = time.Now()
-		order      orderModel.Order
-	)
-	order = orderModel.Order{
-		CanceledAt: &canceledAt,
-	}
-
-	st := state.NewStatusState(current.Status)
-	if st.FSM.Cannot(request.Status.String()) {
-		errorStatus := fmt.Errorf("%w from %s to %s",
-			errorGeneral.ErrInvalidStatusTransition,
-			st.FSM.Current(),
-			request.Status.String())
-		return errorStatus
-	}
-
-	err := tx.WithContext(ctx).
-		Model(&order).
-		Where("uuid = ?", request.UUID).
-		Updates(orderModel.Order{
-			Status:     constant.Cancelled,
-			CanceledAt: &canceledAt,
-		}).Error
+func (o *IOrder) DeleteByOrderID(ctx context.Context, orderID uint) error {
+	err := o.db.WithContext(ctx).
+		Where("uuid = ?", orderID).
+		Delete(&orderModel.Order{}).Error
 	if err != nil {
 		return errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}

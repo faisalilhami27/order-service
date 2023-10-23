@@ -2,18 +2,24 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
+	"order-service/utils/response"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 
-	"order-service/config"
-	controllerRegistry "order-service/controllers"
 	orderModel "order-service/domain/models/order"
 	orderHistoryModel "order-service/domain/models/orderhistory"
 	orderPaymentModel "order-service/domain/models/orderpayment"
+	subOrderModel "order-service/domain/models/suborder"
+
+	"order-service/config"
 	"order-service/migrations"
+
+	clientRegistry "order-service/clients"
+	controllerRegistry "order-service/controllers"
 	repositoryRegistry "order-service/repositories"
 	routeRegistry "order-service/routes"
 	serviceRegistry "order-service/services"
@@ -47,6 +53,7 @@ var restCmd = &cobra.Command{
 		// Database Auto Migration from model
 		err = db.AutoMigrate(
 			&orderModel.Order{},
+			&subOrderModel.SubOrder{},
 			&orderHistoryModel.OrderHistory{},
 			&orderPaymentModel.OrderPayment{},
 		)
@@ -54,11 +61,19 @@ var restCmd = &cobra.Command{
 			panic(err)
 		}
 
+		client := clientRegistry.NewClientRegistry()
 		repository := repositoryRegistry.NewRepositoryRegistry(db)
-		service := serviceRegistry.NewServiceRegistry(repository)
+		service := serviceRegistry.NewServiceRegistry(repository, client)
 		controller := controllerRegistry.NewControllerRegistry(service)
 
 		router := gin.Default()
+		router.NoRoute(func(c *gin.Context) {
+			c.JSON(http.StatusNotFound, response.Response{
+				Status:  "error",
+				Message: fmt.Sprintf("Path %s", http.StatusText(http.StatusNotFound)),
+			})
+		})
+
 		router.Use(func(c *gin.Context) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH")

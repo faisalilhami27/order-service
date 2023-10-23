@@ -1,12 +1,12 @@
 package controllers
 
 import (
-	orderRoute "order-service/controllers/order"
+	orderRoute "order-service/controllers/suborder"
 	serviceRegistry "order-service/services"
 )
 
 type IControllerRegistry interface {
-	GetOrder() orderRoute.IOrderController
+	GetSubOrder() orderRoute.ISubOrderController
 }
 
 type ControllerRegistry struct {
@@ -19,6 +19,6 @@ func NewControllerRegistry(service serviceRegistry.IServiceRegistry) IController
 	}
 }
 
-func (r *ControllerRegistry) GetOrder() orderRoute.IOrderController {
+func (r *ControllerRegistry) GetSubOrder() orderRoute.ISubOrderController {
 	return orderRoute.NewOrderController(r.service)
 }
