@@ -18,6 +18,7 @@ type IOrderPayment struct {
 
 type IOrderPaymentRepository interface {
 	Create(context.Context, *gorm.DB, *orderPaymentDTO.OrderPaymentRequest) error
+	Update(context.Context, *gorm.DB, *orderPaymentDTO.OrderPaymentRequest) error
 }
 
 func NewOrderPayment(db *gorm.DB) IOrderPaymentRepository {
@@ -35,14 +36,47 @@ func (o *IOrderPayment) Create(
 	datetime := time.Now().In(location)
 
 	orderPayment := orderPaymentModel.OrderPayment{
-		SubOrderID: request.SubOrderID,
-		PaymentID:  request.PaymentID,
-		PaymentURL: request.PaymentLink,
-		Status:     request.Status,
-		CreatedAt:  &datetime,
-		UpdatedAt:  &datetime,
+		Amount:      request.Amount,
+		SubOrderID:  request.SubOrderID,
+		InvoiceID:   request.InvoiceID,
+		PaymentID:   request.PaymentID,
+		PaymentURL:  &request.PaymentLink,
+		PaymentType: request.PaymentType,
+		VANumber:    request.VANumber,
+		Bank:        request.Bank,
+		Acquirer:    request.Acquirer,
+		Status:      request.Status,
+		ExpiredAt:   request.ExpiredAt,
+		PaidAt:      request.PaidAt,
+		CreatedAt:   &datetime,
+		UpdatedAt:   &datetime,
 	}
 	err := tx.WithContext(ctx).Create(&orderPayment).Error
+	if err != nil {
+		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return nil
+}
+
+func (o *IOrderPayment) Update(
+	ctx context.Context,
+	tx *gorm.DB,
+	request *orderPaymentDTO.OrderPaymentRequest,
+) error {
+	orderPayment := orderPaymentModel.OrderPayment{
+		Amount:      request.Amount,
+		PaymentID:   request.PaymentID,
+		PaymentURL:  &request.PaymentLink,
+		PaymentType: request.PaymentType,
+		VANumber:    request.VANumber,
+		Bank:        request.Bank,
+		Acquirer:    request.Acquirer,
+		Status:      request.Status,
+		PaidAt:      request.PaidAt,
+	}
+	err := tx.WithContext(ctx).
+		Where("payment_id = ?", request.PaymentID).
+		Updates(&orderPayment).Error
 	if err != nil {
 		return errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}

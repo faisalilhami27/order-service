@@ -8,14 +8,12 @@ const (
 	Pending        OrderStatus = 100
 	PendingPayment OrderStatus = 200
 	PaymentSuccess OrderStatus = 300
-	Completed      OrderStatus = 400
-	Cancelled      OrderStatus = 500
+	Cancelled      OrderStatus = 400
 
 	InitialString        OrderStatusString = "initial"
 	PendingString        OrderStatusString = "pending"
-	PendingPaymentString OrderStatusString = "pending payment"
-	PaymentSuccessString OrderStatusString = "payment success"
-	CompletedString      OrderStatusString = "completed"
+	PendingPaymentString OrderStatusString = "pending-payment"
+	PaymentSuccessString OrderStatusString = "payment-success"
 	CancelledString      OrderStatusString = "cancelled"
 )
 
@@ -24,7 +22,6 @@ var mapOrderStatusIntToString = map[OrderStatus]OrderStatusString{
 	Pending:        PendingString,
 	PendingPayment: PendingPaymentString,
 	PaymentSuccess: PaymentSuccessString,
-	Completed:      CompletedString,
 	Cancelled:      CancelledString,
 }
 
@@ -33,7 +30,6 @@ var mapOrderStatusStringToInt = map[OrderStatusString]OrderStatus{
 	PendingString:        Pending,
 	PendingPaymentString: PendingPayment,
 	PaymentSuccessString: PaymentSuccess,
-	CompletedString:      Completed,
 	CancelledString:      Cancelled,
 }
 

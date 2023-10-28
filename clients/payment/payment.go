@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/parnurzeal/gorequest"
-
 	"net/http"
 
+	clientConfig "order-service/clients/config"
 	"order-service/config"
 	"order-service/constant"
 	"order-service/utils/helper"
@@ -15,22 +14,25 @@ import (
 	"time"
 )
 
-type IPayment struct{}
+type IPayment struct {
+	client clientConfig.IClientConfig
+}
 
 type IPaymentClient interface {
 	CreatePaymentLink(*PaymentRequest) (*PaymentData, error)
 }
 
-func NewPaymentClient() IPaymentClient {
-	return &IPayment{}
+func NewPaymentClient(client clientConfig.IClientConfig) IPaymentClient {
+	return &IPayment{
+		client: client,
+	}
 }
 
 func (p *IPayment) CreatePaymentLink(request *PaymentRequest) (*PaymentData, error) {
-	httpRequest := gorequest.New()
 	unixTime := time.Now().Unix()
 	generateAPIKey := fmt.Sprintf("%s:%s:%d",
 		config.Config.AppName,
-		config.Config.InternalService.Payment.SecretKey,
+		p.client.SecretKey(),
 		unixTime)
 	apiKey := helper.GenerateSHA256(generateAPIKey)
 
@@ -39,9 +41,9 @@ func (p *IPayment) CreatePaymentLink(request *PaymentRequest) (*PaymentData, err
 		return nil, err
 	}
 
-	clone := httpRequest.Clone()
+	clone := p.client.Client().Clone()
 	resp, bodyResp, errs := clone.
-		Post(fmt.Sprintf("%s/api/v1/payment", config.Config.InternalService.Payment.Host)).
+		Post(fmt.Sprintf("%s/api/v1/payment", p.client.BaseURL())).
 		Set(constant.XServiceName, config.Config.AppName).
 		Set(constant.XApiKey, apiKey).
 		Set(constant.XRequestAt, fmt.Sprintf("%d", unixTime)).

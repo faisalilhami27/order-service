@@ -12,12 +12,24 @@ import (
 var Config AppConfig
 
 type AppConfig struct {
-	Port            int             `json:"port" yaml:"port"`
-	AppName         string          `json:"appName" yaml:"appName"`
-	AppEnv          string          `json:"appEnv" yaml:"appEnv"`
-	SignatureKey    string          `json:"signatureKey" yaml:"signatureKey"`
-	Database        Database        `json:"database" yaml:"database"`
-	InternalService InternalService `json:"internalService" yaml:"internalService"`
+	Port                               int             `json:"port" yaml:"port"`
+	AppName                            string          `json:"appName" yaml:"appName"`
+	AppEnv                             string          `json:"appEnv" yaml:"appEnv"`
+	SignatureKey                       string          `json:"signatureKey" yaml:"signatureKey"`
+	Database                           Database        `json:"database" yaml:"database"`
+	InternalService                    InternalService `json:"internalService" yaml:"internalService"`
+	KafkaHosts                         []string        `json:"kafkaHosts" yaml:"kafkaHosts"`
+	KafkaTimeoutInMs                   int             `json:"kafkaTimeoutInMs" yaml:"kafkaTimeoutInMs"`
+	KafkaMaxRetry                      int             `json:"kafkaMaxRetry" yaml:"kafkaMaxRetry"`
+	KafkaProducerTopic                 string          `json:"kafkaProducerTopic" yaml:"kafkaProducerTopic"`
+	KafkaConsumerFetchDefault          int32           `json:"kafkaConsumerFetchDefault" yaml:"kafkaConsumerFetchDefault"`
+	KafkaConsumerFetchMin              int32           `json:"kafkaConsumerFetchMin" yaml:"kafkaConsumerFetchMin"`
+	KafkaConsumerFetchMax              int32           `json:"kafkaConsumerFetchMax" yaml:"kafkaConsumerFetchMax"`
+	KafkaConsumerMaxWaitTimeInMs       int32           `json:"kafkaConsumerMaxWaitTimeInMs" yaml:"kafkaConsumerMaxWaitTimeInMs"`     //nolint:lll
+	KafkaConsumerMaxProcessingTimeInMs int32           `json:"kafkaConsumerMaxProcessingTimeInMs" yaml:"kafkaConsumerMaxProcTimeMs"` //nolint:lll
+	KafkaConsumerBackoffTimeInMs       int32           `json:"kafkaConsumerBackoffTimeInMs" yaml:"kafkaConsumerBackoffTimeMs"`       //nolint:lll
+	KafkaConsumerTopics                []string        `json:"kafkaConsumerStatusTopics" yaml:"kafkaConsumerTopics"`
+	KafkaConsumerGroupID               string          `json:"kafkaConsumerGroupID" yaml:"kafkaConsumerGroupID"`
 }
 
 type Database struct {

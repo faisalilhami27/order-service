@@ -1,6 +1,10 @@
 package clients
 
-import paymentClient "order-service/clients/payment"
+import (
+	clientConfig "order-service/clients/config"
+	paymentClient "order-service/clients/payment"
+	"order-service/config"
+)
 
 type Client struct{}
 
@@ -13,5 +17,8 @@ func NewClientRegistry() IClientRegistry {
 }
 
 func (c *Client) GetPayment() paymentClient.IPaymentClient {
-	return paymentClient.NewPaymentClient()
+	return paymentClient.NewPaymentClient(clientConfig.NewClientConfig(
+		clientConfig.WithBaseURL(config.Config.InternalService.Payment.Host),
+		clientConfig.WithSecretKey(config.Config.InternalService.Payment.SecretKey),
+	))
 }

@@ -25,11 +25,6 @@ var mapProcessFlow = map[string]fsm.Events{
 			Dst:  constant.PaymentSuccess.String(),
 		},
 		{
-			Name: constant.Completed.String(),
-			Src:  []string{constant.PaymentSuccess.String()},
-			Dst:  constant.Completed.String(),
-		},
-		{
 			Name: constant.Cancelled.String(),
 			Src: []string{
 				constant.Pending.String(),

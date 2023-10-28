@@ -3,7 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
-	"order-service/controllers"
+	controllerRegistry "order-service/controllers/http"
 )
 
 type ISubOrderRoute interface {
@@ -11,12 +11,12 @@ type ISubOrderRoute interface {
 }
 
 type SubOrderRoute struct {
-	controller controllers.IControllerRegistry
+	controller controllerRegistry.IControllerRegistry
 	route      *gin.RouterGroup
 }
 
 func NewSubOrderRoute(
-	controller controllers.IControllerRegistry,
+	controller controllerRegistry.IControllerRegistry,
 	route *gin.RouterGroup,
 ) ISubOrderRoute {
 	return &SubOrderRoute{

@@ -33,6 +33,9 @@ type ISubOrderService interface {
 	Cancel(context.Context, string) error
 	GetSubOrderList(context.Context, *subOrderDTO.SubOrderRequestParam) (*helper.PaginationResult, error)
 	GetOrderDetail(context.Context, string) (*subOrderDTO.SubOrderResponse, error)
+	ReceivePendingPayment(context.Context, *subOrderDTO.PaymentRequest) error
+	ReceivePaymentSettlement(context.Context, *subOrderDTO.PaymentRequest) error
+	ReceivePaymentExpire(context.Context, *subOrderDTO.PaymentRequest) error
 }
 
 func NewSubOrderService(
@@ -68,13 +71,12 @@ func (o *ISubOrder) GetSubOrderList(
 			Amount:       order.Amount,
 			Status:       order.Status,
 			IsPaid:       order.IsPaid,
-			CompletedAt:  order.CompletedAt,
 			CreatedAt:    order.CreatedAt,
 			UpdatedAt:    order.UpdatedAt,
 			Payment: &orderPaymentDTO.OrderPaymentResponse{
 				PaymentID:   order.Payment.PaymentID,
 				InvoiceID:   order.Payment.InvoiceID,
-				PaymentLink: order.Payment.PaymentURL,
+				PaymentLink: *order.Payment.PaymentURL,
 				Status:      order.Payment.Status,
 			},
 		})
@@ -108,11 +110,10 @@ func (o *ISubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*s
 		Amount:       subOrder.Amount,
 		Status:       subOrder.Status,
 		IsPaid:       subOrder.IsPaid,
-		CompletedAt:  subOrder.CompletedAt,
 		Payment: &orderPaymentDTO.OrderPaymentResponse{
 			PaymentID:   subOrder.Payment.PaymentID,
 			InvoiceID:   subOrder.Payment.InvoiceID,
-			PaymentLink: subOrder.Payment.PaymentURL,
+			PaymentLink: *subOrder.Payment.PaymentURL,
 			Status:      subOrder.Payment.Status,
 		},
 	}
@@ -128,8 +129,10 @@ func (o *ISubOrder) CreateOrder(
 		subOrder        *subOrderModel.SubOrder
 		order           *orderModel.Order
 		txErr           error
-		completedAt     *time.Time
+		paidAt          *time.Time
 		paymentResponse *paymentClient.PaymentData
+		isPaid          = false
+		orderHistories  []orderHistoryDTO.OrderHistoryRequest
 	)
 
 	today := time.Now()
@@ -149,16 +152,11 @@ func (o *ISubOrder) CreateOrder(
 			return errOrder.ErrOrderNotEmpty
 		}
 
-		if request.PaymentType == constant.PTFullPayment {
-			utcTimeAddSevenHour := time.Now().UTC().Add(7 * time.Hour)
-			completedAt = &utcTimeAddSevenHour
-		}
-
 		order, txErr = o.repository.GetOrder().Create(ctx, tx, &orderDTO.OrderRequest{
-			CustomerID:  request.CustomerID,
-			PackageID:   request.PackageID,
-			OrderDate:   request.OrderDate,
-			CompletedAt: completedAt,
+			CustomerID: request.CustomerID,
+			PackageID:  request.PackageID,
+			OrderDate:  request.OrderDate,
+			IsPaid:     &isPaid,
 		})
 		if txErr != nil {
 			return txErr
@@ -174,17 +172,42 @@ func (o *ISubOrder) CreateOrder(
 			return txErr
 		}
 
-		txErr = o.repository.GetOrderHistoryRepository().Create(ctx, tx, &orderHistoryDTO.OrderHistoryRequest{
-			SubOrderID: subOrder.ID,
-			Status:     constant.PendingString,
-		})
+		if request.PaymentType == constant.PTFullPayment {
+			newPaidAt := today.UTC().Add(7 * time.Hour)
+			isPaid = true
+			paidAt = &newPaidAt
+			orderHistories = []orderHistoryDTO.OrderHistoryRequest{
+				{
+					SubOrderID: subOrder.ID,
+					Status:     constant.PendingString,
+				},
+				{
+					SubOrderID: subOrder.ID,
+					Status:     constant.PendingPaymentString,
+				},
+				{
+					SubOrderID: subOrder.ID,
+					Status:     constant.PaymentSuccessString,
+				},
+			}
+		} else {
+			orderHistories = []orderHistoryDTO.OrderHistoryRequest{
+				{
+					SubOrderID: subOrder.ID,
+					Status:     constant.PendingString,
+				},
+			}
+		}
+
+		txErr = o.repository.GetOrderHistoryRepository().BulkCreate(ctx, tx, orderHistories)
 		if txErr != nil {
 			return txErr
 		}
 
+		expiredAt := time.Now().Add(24 * time.Hour)
 		paymentResponse, txErr = o.client.GetPayment().CreatePaymentLink(&paymentClient.PaymentRequest{
 			OrderID:     subOrder.UUID,
-			ExpiredAt:   time.Now().Add(24 * time.Hour),
+			ExpiredAt:   expiredAt,
 			Amount:      request.Amount,
 			Description: request.PaymentType.Title(),
 			CustomerDetail: paymentClient.CustomerDetail{
@@ -207,11 +230,14 @@ func (o *ISubOrder) CreateOrder(
 
 		txErr = o.repository.GetOrderPaymentRepository().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
+				Amount:      request.Amount,
 				SubOrderID:  subOrder.ID,
 				PaymentID:   paymentResponse.UUID,
 				PaymentLink: paymentResponse.PaymentLink,
 				InvoiceID:   uuid.New(),
 				Status:      paymentResponse.Status,
+				ExpiredAt:   &expiredAt,
+				PaidAt:      paidAt,
 			})
 		if txErr != nil {
 			return txErr
@@ -259,9 +285,9 @@ func (o *ISubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
 			return errOrder.ErrCancelOrder
 		}
 
-		uuid, _ := uuid.Parse(subOrderUUID) //nolint:errcheck
+		uuidParse, _ := uuid.Parse(subOrderUUID) //nolint:errcheck
 		txErr = o.repository.GetSubOrderRepository().Cancel(ctx, tx, &subOrderDTO.CancelRequest{
-			UUID:   uuid,
+			UUID:   uuidParse,
 			Status: constant.Cancelled,
 		}, &subOrderModel.SubOrder{
 			Status: order.Status,
@@ -291,4 +317,96 @@ func (o *ISubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
 	}
 
 	return nil
+}
+
+func (o *ISubOrder) processPayment(
+	ctx context.Context,
+	request *subOrderDTO.PaymentRequest,
+	status constant.OrderStatus,
+) error {
+	tx := o.repository.GetTx()
+	err := tx.Transaction(func(tx *gorm.DB) error {
+		subOrder, err := o.repository.GetSubOrderRepository().FindOneByUUID(ctx, request.OrderID.String())
+		if err != nil {
+			return err
+		}
+
+		var (
+			updateRequest subOrderDTO.UpdateSubOrderRequest
+			paidAt        *time.Time
+		)
+
+		switch status {
+		case constant.PaymentSuccess:
+			isPaid := true
+			paidAt = request.PaidAt
+			updateRequest = subOrderDTO.UpdateSubOrderRequest{
+				Status: constant.PaymentSuccess,
+				IsPaid: &isPaid,
+			}
+		case constant.Cancelled:
+			canceledAt := time.Now().UTC().Add(7 * time.Hour)
+			updateRequest = subOrderDTO.UpdateSubOrderRequest{
+				Status:     constant.Cancelled,
+				CanceledAt: &canceledAt,
+			}
+		case constant.PendingPayment:
+			updateRequest = subOrderDTO.UpdateSubOrderRequest{
+				Status: constant.PendingPayment,
+			}
+		default:
+			return errorGeneral.ErrStatus
+		}
+
+		txErr := o.repository.GetSubOrderRepository().Update(ctx, tx, &updateRequest, &subOrderModel.SubOrder{
+			UUID:   subOrder.UUID,
+			Status: subOrder.Status,
+		})
+		if txErr != nil {
+			return txErr
+		}
+
+		txErr = o.repository.GetOrderHistoryRepository().Create(ctx, tx, &orderHistoryDTO.OrderHistoryRequest{
+			SubOrderID: subOrder.ID,
+			Status:     constant.OrderStatusString(status.String()),
+		})
+		if txErr != nil {
+			return txErr
+		}
+
+		txErr = o.repository.GetOrderPaymentRepository().
+			Update(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
+				Amount:      request.Amount,
+				PaymentID:   request.PaymentID,
+				PaymentLink: request.PaymentLink,
+				PaymentType: &request.PaymentType,
+				VANumber:    request.VaNumber,
+				Bank:        request.Bank,
+				Acquirer:    request.Acquirer,
+				Status:      &request.Status,
+				PaidAt:      paidAt,
+			})
+		if txErr != nil {
+			return txErr
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *ISubOrder) ReceivePendingPayment(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
+	return o.processPayment(ctx, request, constant.PendingPayment)
+}
+
+func (o *ISubOrder) ReceivePaymentSettlement(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
+	return o.processPayment(ctx, request, constant.PaymentSuccess)
+}
+
+func (o *ISubOrder) ReceivePaymentExpire(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
+	return o.processPayment(ctx, request, constant.Cancelled)
 }

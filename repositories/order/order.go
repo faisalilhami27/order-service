@@ -40,7 +40,9 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 ) (*orderModel.Order, error) {
 	var order orderModel.Order
 	err := o.db.WithContext(ctx).
-		Preload("SubOrder", "completed_at IS NULL AND canceled_at IS NULL").
+		InnerJoins("INNER JOIN sub_orders ON sub_orders.order_id = orders.id").
+		InnerJoins("INNER JOIN order_payments ON order_payments.sub_order_id = sub_orders.id").
+		Where("order_payments.paid_at IS NULL AND sub_orders.canceled_at IS NULL").
 		Where("customer_id = ?", customerID).
 		Order("id DESC").
 		Clauses(clause.Locking{Strength: "UPDATE"}).

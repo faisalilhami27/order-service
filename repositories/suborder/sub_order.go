@@ -31,6 +31,7 @@ type ISubOrderRepository interface {
 	FindAllWithPagination(context.Context, *subOrderDTO.SubOrderRequestParam) ([]subOrderModel.SubOrder, int64, error)
 	Cancel(context.Context, *gorm.DB, *subOrderDTO.CancelRequest, *subOrderModel.SubOrder) error
 	BulkCreate(context.Context, *gorm.DB, []subOrderDTO.SubOrderRequest) ([]subOrderModel.SubOrder, error)
+	Update(context.Context, *gorm.DB, *subOrderDTO.UpdateSubOrderRequest, *subOrderModel.SubOrder) error
 }
 
 func NewSubOrder(db *gorm.DB) ISubOrderRepository {
@@ -247,4 +248,34 @@ func (o *ISubOrder) autoNumber(ctx context.Context) (*string, error) {
 	}
 
 	return &result, nil
+}
+
+func (o *ISubOrder) Update(
+	ctx context.Context,
+	tx *gorm.DB,
+	request *subOrderDTO.UpdateSubOrderRequest,
+	current *subOrderModel.SubOrder,
+) error {
+	subOrder := subOrderModel.SubOrder{
+		Status:     request.Status,
+		IsPaid:     request.IsPaid,
+		CanceledAt: request.CanceledAt,
+	}
+
+	st := state.NewStatusState(current.Status)
+	if st.FSM.Cannot(request.Status.String()) {
+		errorStatus := fmt.Errorf("%w from %s to %s",
+			errorGeneral.ErrInvalidStatusTransition,
+			st.FSM.Current(),
+			request.Status.String())
+		return errorStatus
+	}
+
+	err := tx.WithContext(ctx).
+		Where("uuid = ?", current.UUID).
+		Updates(&subOrder).Error
+	if err != nil {
+		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return nil
 }

@@ -18,6 +18,28 @@ type SubOrderRequest struct {
 	Status      constant.OrderStatus `json:"status"`
 	IsPaid      *bool                `json:"isPaid"`
 	PaymentType constant.PaymentType `json:"paymentType" validate:"required,oneof=down_payment half_payment full_payment"`
+	CanceledAt  *time.Time           `json:"canceledAt"`
+}
+
+type UpdateSubOrderRequest struct {
+	OrderID    uuid.UUID            `json:"order_id"`
+	Status     constant.OrderStatus `json:"status"`
+	IsPaid     *bool                `json:"is_paid"`
+	CanceledAt *time.Time           `json:"canceled_at"`
+}
+
+type PaymentRequest struct {
+	OrderID     uuid.UUID  `json:"order_id"`
+	PaymentID   uuid.UUID  `json:"payment_id"`
+	PaymentLink string     `json:"payment_link"`
+	PaymentType string     `json:"payment_type"`
+	Amount      float64    `json:"amount"`
+	Status      string     `json:"status"`
+	VaNumber    *string    `json:"va_number"`
+	Bank        *string    `json:"bank"`
+	Acquirer    *string    `json:"acquirer"`
+	ExpiredAt   *time.Time `json:"expired_at"`
+	PaidAt      *time.Time `json:"paid_at"`
 }
 
 type CancelRequest struct {
@@ -39,7 +61,6 @@ type SubOrderResponse struct {
 	Status       constant.OrderStatus                  `json:"status"`
 	OrderDate    time.Time                             `json:"orderDate,omitempty"`
 	IsPaid       *bool                                 `json:"isPaid"`
-	CompletedAt  *time.Time                            `json:"completedAt,omitempty"`
 	CanceledAt   *time.Time                            `json:"canceledAt,omitempty"`
 	CreatedAt    *time.Time                            `json:"createdAt"`
 	UpdatedAt    *time.Time                            `json:"updatedAt"`

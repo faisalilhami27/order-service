@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	orderRoute "order-service/controllers/suborder"
+	orderRoute "order-service/controllers/http/suborder"
 	serviceRegistry "order-service/services"
 )
 
