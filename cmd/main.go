@@ -109,9 +109,9 @@ var restCmd = &cobra.Command{
 		kafkaConsumerConfig.Consumer.Fetch.Default = config.Config.KafkaConsumerFetchDefault
 		kafkaConsumerConfig.Consumer.Fetch.Min = config.Config.KafkaConsumerFetchMin
 		kafkaConsumerConfig.Consumer.Fetch.Max = config.Config.KafkaConsumerFetchMax
-		kafkaConsumerConfig.Consumer.MaxWaitTime = time.Duration(config.Config.KafkaConsumerMaxWaitTimeInMs) * time.Millisecond
+		kafkaConsumerConfig.Consumer.MaxWaitTime = time.Duration(config.Config.KafkaConsumerMaxWaitTimeInMs) * time.Millisecond             //nolint: lll
 		kafkaConsumerConfig.Consumer.MaxProcessingTime = time.Duration(config.Config.KafkaConsumerMaxProcessingTimeInMs) * time.Millisecond //nolint: lll
-		kafkaConsumerConfig.Consumer.Retry.Backoff = time.Duration(config.Config.KafkaConsumerBackoffTimeInMs) * time.Millisecond
+		kafkaConsumerConfig.Consumer.Retry.Backoff = time.Duration(config.Config.KafkaConsumerBackoffTimeInMs) * time.Millisecond           //nolint: lll
 
 		kafkaConsumerClient, err := sarama.NewClient(config.Config.KafkaHosts, kafkaConsumerConfig)
 		if err != nil {

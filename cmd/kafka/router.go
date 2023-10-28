@@ -1,13 +1,14 @@
 package kafka
 
 import (
-	"fmt"
 	"order-service/config"
 	kafkaRegistry "order-service/controllers/kafka"
 	paymentTopic "order-service/controllers/kafka/payment"
-	"slices"
+
+	"golang.org/x/exp/slices"
 )
 
+//nolint:revive
 type KafkaRouter struct {
 	consumer      *ConsumerGroup
 	kafkaRegistry kafkaRegistry.IKafkaRegistry
@@ -32,9 +33,7 @@ func (r *KafkaRouter) Register() {
 }
 
 func (r *KafkaRouter) paymentHandler() {
-	fmt.Println("payment topic", r.kafkaRegistry.GetPayment().HandlePayment)
 	if slices.Contains(config.Config.KafkaConsumerTopics, paymentTopic.PaymentTopic) {
-		fmt.Println("payment topic1", paymentTopic.PaymentTopic)
 		r.consumer.RegisterTopicHandler(paymentTopic.PaymentTopic, r.kafkaRegistry.GetPayment().HandlePayment)
 	}
 }

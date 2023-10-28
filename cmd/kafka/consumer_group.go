@@ -52,6 +52,7 @@ func (c *ConsumerGroup) Cleanup(sarama.ConsumerGroupSession) error {
 	return nil
 }
 
+//nolint:gocognit,cyclop
 func (c *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	messageChan := claim.Messages()
 
