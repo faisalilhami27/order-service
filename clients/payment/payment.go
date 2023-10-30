@@ -50,7 +50,7 @@ func (p *IPayment) CreatePaymentLink(request *PaymentRequest) (*PaymentData, err
 		Send(string(body)).
 		End()
 
-	var errResponse ErrorResponse
+	var errResponse ErrorPaymentResponse
 	if resp.StatusCode != http.StatusCreated || len(errs) > 0 {
 		err = json.Unmarshal([]byte(bodyResp), &errResponse)
 		if err != nil {

@@ -153,3 +153,11 @@ func GenerateSHA256(inputString string) string {
 	hashString := hex.EncodeToString(hashBytes)
 	return hashString
 }
+
+func HandlePanic() {
+	if r := recover(); r != nil {
+		log.SetLevel(log.ErrorLevel)
+		log.Errorf("error occured: %v", r)
+		return
+	}
+}

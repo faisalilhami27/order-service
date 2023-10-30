@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"order-service/utils/helper"
 
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
@@ -31,6 +32,8 @@ func NewPaymentKafka(service serviceRegistry.IServiceRegistry) IPaymentKafka {
 }
 
 func (p *PaymentKafka) HandlePayment(ctx context.Context, message *sarama.ConsumerMessage) error {
+	defer helper.HandlePanic()
+
 	var body dto.PaymentContent
 	err := json.Unmarshal(message.Value, &body)
 	if err != nil {

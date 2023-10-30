@@ -30,7 +30,7 @@ type ItemDetail struct {
 	Quantity int                       `json:"quantity"`
 }
 
-type ErrorResponse struct {
+type ErrorPaymentResponse struct {
 	Code    int    `json:"code"`
 	Status  string `json:"status"`
 	Message any    `json:"message"`

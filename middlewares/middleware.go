@@ -14,7 +14,7 @@ func HandlePanic(c *gin.Context) {
 		if r := recover(); r != nil {
 			log.SetLevel(log.ErrorLevel)
 			log.Errorf("error occured: %v", r)
-			c.JSON(http.StatusBadRequest, response.ResponseError(r.(error))) //nolint:forcetypeassert
+			c.JSON(http.StatusBadRequest, response.ResponsePanicError(r))
 			return
 		}
 	}()

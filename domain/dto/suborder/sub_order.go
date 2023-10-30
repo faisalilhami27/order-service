@@ -10,9 +10,9 @@ import (
 )
 
 type SubOrderRequest struct {
-	OrderID     uint                 `json:"orderID"`
-	CustomerID  string               `json:"customerID" validate:"required"`
-	PackageID   string               `json:"packageID" validate:"required"`
+	OrderID     uuid.UUID            `json:"orderID" validate:"required_unless=PaymentType down_payment"`
+	CustomerID  uuid.UUID            `json:"customerID" validate:"required"`
+	PackageID   uuid.UUID            `json:"packageID" validate:"required"`
 	Amount      float64              `json:"amount" validate:"required"`
 	OrderDate   time.Time            `json:"orderDate" validate:"required"`
 	Status      constant.OrderStatus `json:"status"`

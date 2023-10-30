@@ -11,9 +11,9 @@ import (
 
 type IRepositoryRegistry interface {
 	GetTx() *gorm.DB
-	GetSubOrderRepository() subOrderRepo.ISubOrderRepository
-	GetOrderHistoryRepository() orderHistoryRepo.IOrderHistoryRepository
-	GetOrderPaymentRepository() orderPaymentRepo.IOrderPaymentRepository
+	GetSubOrder() subOrderRepo.ISubOrderRepository
+	GetOrderHistory() orderHistoryRepo.IOrderHistoryRepository
+	GetOrderPayment() orderPaymentRepo.IOrderPaymentRepository
 	GetOrder() orderRepo.IOrderRepository
 }
 
@@ -27,15 +27,15 @@ func NewRepositoryRegistry(db *gorm.DB) IRepositoryRegistry {
 	}
 }
 
-func (r *Registry) GetSubOrderRepository() subOrderRepo.ISubOrderRepository {
+func (r *Registry) GetSubOrder() subOrderRepo.ISubOrderRepository {
 	return subOrderRepo.NewSubOrder(r.db)
 }
 
-func (r *Registry) GetOrderHistoryRepository() orderHistoryRepo.IOrderHistoryRepository {
+func (r *Registry) GetOrderHistory() orderHistoryRepo.IOrderHistoryRepository {
 	return orderHistoryRepo.NewOrderHistory(r.db)
 }
 
-func (r *Registry) GetOrderPaymentRepository() orderPaymentRepo.IOrderPaymentRepository {
+func (r *Registry) GetOrderPayment() orderPaymentRepo.IOrderPaymentRepository {
 	return orderPaymentRepo.NewOrderPayment(r.db)
 }
 

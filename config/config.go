@@ -47,9 +47,15 @@ type Database struct {
 
 type InternalService struct {
 	Payment Payment `json:"payment" yaml:"payment"`
+	RBAC    RBAC    `json:"rbac" yaml:"rbac"`
 }
 
 type Payment struct {
+	Host      string `json:"host" yaml:"host"`
+	SecretKey string `json:"secret_key" yaml:"secretKey"`
+}
+
+type RBAC struct {
 	Host      string `json:"host" yaml:"host"`
 	SecretKey string `json:"secret_key" yaml:"secretKey"`
 }

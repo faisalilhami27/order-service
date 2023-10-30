@@ -31,6 +31,14 @@ func ResponseError(err error) Response {
 }
 
 //nolint:revive
+func ResponsePanicError(err any) Response {
+	return Response{
+		Status:  constant.Error,
+		Message: err.(string), //nolint:forcetypeassert
+	}
+}
+
+//nolint:revive
 func ResponseErrorValidation(response []errorValidation.ValidationResponse) Response {
 	return Response{
 		Status:  constant.Error,

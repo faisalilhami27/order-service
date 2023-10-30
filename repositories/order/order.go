@@ -24,8 +24,11 @@ type IOrder struct {
 
 type IOrderRepository interface {
 	Create(context.Context, *gorm.DB, *orderDTO.OrderRequest) (*orderModel.Order, error)
-	DeleteByOrderID(context.Context, uint) error
+	DeleteByOrderID(context.Context, *gorm.DB, uint) error
+	FindOneOrderByUUID(context.Context, uuid.UUID) (*orderModel.Order, error)
+	FindOneOrderByID(context.Context, uint) (*orderModel.Order, error)
 	FindOneOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*orderModel.Order, error)
+	Update(ctx context.Context, db *gorm.DB, request *orderDTO.OrderRequest) error
 }
 
 func NewOrder(db *gorm.DB) IOrderRepository {
@@ -56,6 +59,42 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 	return &order, nil
 }
 
+func (o *IOrder) FindOneOrderByUUID(
+	ctx context.Context,
+	uuid uuid.UUID,
+) (*orderModel.Order, error) {
+	var order orderModel.Order
+	err := o.db.WithContext(ctx).
+		Where("uuid = ?", uuid).
+		Order("id DESC").
+		First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return &order, nil
+}
+
+func (o *IOrder) FindOneOrderByID(
+	ctx context.Context,
+	id uint,
+) (*orderModel.Order, error) {
+	var order orderModel.Order
+	err := o.db.WithContext(ctx).
+		Where("id = ?", id).
+		Order("id DESC").
+		First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return &order, nil
+}
+
 func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.OrderRequest) (*orderModel.Order, error) {
 	location, _ := time.LoadLocation("Asia/Jakarta") //nolint:errcheck
 	datetime := time.Now().In(location)
@@ -65,12 +104,13 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 	}
 
 	order := orderModel.Order{
-		UUID:       uuid.New(),
-		OrderName:  *orderName,
-		CustomerID: request.CustomerID,
-		PackageID:  request.PackageID,
-		CreatedAt:  &datetime,
-		UpdatedAt:  &datetime,
+		UUID:                       uuid.New(),
+		OrderName:                  *orderName,
+		RemainingOutstandingAmount: request.RemainingOutstandingAmount,
+		CustomerID:                 request.CustomerID,
+		PackageID:                  request.PackageID,
+		CreatedAt:                  &datetime,
+		UpdatedAt:                  &datetime,
 	}
 	err = tx.WithContext(ctx).Create(&order).Error
 	if err != nil {
@@ -79,10 +119,24 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 	return &order, nil
 }
 
-func (o *IOrder) DeleteByOrderID(ctx context.Context, orderID uint) error {
-	err := o.db.WithContext(ctx).
+func (o *IOrder) DeleteByOrderID(ctx context.Context, tx *gorm.DB, orderID uint) error {
+	err := tx.WithContext(ctx).
 		Where("uuid = ?", orderID).
 		Delete(&orderModel.Order{}).Error
+	if err != nil {
+		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return nil
+}
+
+func (o *IOrder) Update(ctx context.Context, tx *gorm.DB, request *orderDTO.OrderRequest) error {
+	err := tx.WithContext(ctx).
+		Model(&orderModel.Order{}).
+		Where("uuid = ?", request.OrderID).
+		Updates(map[string]interface{}{
+			"remaining_outstanding_amount": request.RemainingOutstandingAmount,
+			"completed_at":                 request.CompletedAt,
+		}).Error
 	if err != nil {
 		return errorHelper.WrapError(errorGeneral.ErrSQLError)
 	}

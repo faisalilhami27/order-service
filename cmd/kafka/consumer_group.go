@@ -54,6 +54,7 @@ func (c *ConsumerGroup) Cleanup(sarama.ConsumerGroupSession) error {
 
 //nolint:gocognit,cyclop
 func (c *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+	defer c.Recover()
 	messageChan := claim.Messages()
 
 	for {
@@ -132,7 +133,9 @@ func (c *ConsumerGroup) KeepRunning() bool {
 
 func (c *ConsumerGroup) Recover() {
 	if r := recover(); r != nil {
-		log.Errorf("Recovered from panic: %v", r)
+		log.SetLevel(log.ErrorLevel)
+		log.Errorf("recovered from panic: %v", r)
+		return
 	}
 }
 

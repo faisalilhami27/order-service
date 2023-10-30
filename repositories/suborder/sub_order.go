@@ -25,12 +25,13 @@ type ISubOrder struct {
 }
 
 type ISubOrderRepository interface {
-	Create(context.Context, *gorm.DB, *subOrderDTO.SubOrderRequest) (*subOrderModel.SubOrder, error)
+	Create(context.Context, *gorm.DB, *subOrderModel.SubOrder) (*subOrderModel.SubOrder, error)
 	FindOneSubOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*subOrderModel.SubOrder, error)
 	FindOneByUUID(context.Context, string) (*subOrderModel.SubOrder, error)
+	FindOneByOrderIDAndPaymentType(context.Context, uint, string) (*subOrderModel.SubOrder, error)
 	FindAllWithPagination(context.Context, *subOrderDTO.SubOrderRequestParam) ([]subOrderModel.SubOrder, int64, error)
 	Cancel(context.Context, *gorm.DB, *subOrderDTO.CancelRequest, *subOrderModel.SubOrder) error
-	BulkCreate(context.Context, *gorm.DB, []subOrderDTO.SubOrderRequest) ([]subOrderModel.SubOrder, error)
+	BulkCreate(context.Context, *gorm.DB, []subOrderModel.SubOrder) ([]subOrderModel.SubOrder, error)
 	Update(context.Context, *gorm.DB, *subOrderDTO.UpdateSubOrderRequest, *subOrderModel.SubOrder) error
 }
 
@@ -88,6 +89,27 @@ func (o *ISubOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*subOr
 	return &order, nil
 }
 
+func (o *ISubOrder) FindOneByOrderIDAndPaymentType(
+	ctx context.Context,
+	orderID uint,
+	paymentType string,
+) (*subOrderModel.SubOrder, error) {
+	var order subOrderModel.SubOrder
+	err := o.db.WithContext(ctx).
+		InnerJoins("INNER JOIN order_payments op ON op.sub_order_id = sub_orders.id").
+		Where("sub_orders.payment_type = ?", paymentType).
+		Where("order_id = ?", orderID).
+		Where("paid_at IS NOT NULL").
+		First(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errOrder.ErrOrderNotFound
+		}
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+	}
+	return &order, nil
+}
+
 func (o *ISubOrder) FindOneSubOrderByCustomerIDWithLocking(
 	ctx context.Context,
 	customerID uuid.UUID,
@@ -112,7 +134,7 @@ func (o *ISubOrder) FindOneSubOrderByCustomerIDWithLocking(
 func (o *ISubOrder) Create(
 	ctx context.Context,
 	tx *gorm.DB,
-	request *subOrderDTO.SubOrderRequest,
+	request *subOrderModel.SubOrder,
 ) (*subOrderModel.SubOrder, error) {
 	isPaid := false
 	subOrderName, err := o.autoNumber(ctx)
@@ -127,6 +149,7 @@ func (o *ISubOrder) Create(
 		Status:       request.Status,
 		Amount:       request.Amount,
 		PaymentType:  request.PaymentType,
+		OrderDate:    request.OrderDate,
 		IsPaid:       &isPaid,
 	}
 
@@ -149,7 +172,7 @@ func (o *ISubOrder) Create(
 func (o *ISubOrder) BulkCreate(
 	ctx context.Context,
 	tx *gorm.DB,
-	requests []subOrderDTO.SubOrderRequest,
+	requests []subOrderModel.SubOrder,
 ) ([]subOrderModel.SubOrder, error) {
 	isPaid := false
 	subOrderName, err := o.autoNumber(ctx)

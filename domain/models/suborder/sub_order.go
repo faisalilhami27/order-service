@@ -21,6 +21,7 @@ type SubOrder struct {
 	Amount       float64              `gorm:"not null"`
 	Status       constant.OrderStatus `gorm:"not null"`
 	IsPaid       *bool                `gorm:"not null"`
+	OrderDate    time.Time            `gorm:"not null"`
 	CanceledAt   *time.Time
 	PaymentType  constant.PaymentType
 	Order        orderModel.Order                 `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

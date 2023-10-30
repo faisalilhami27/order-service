@@ -119,7 +119,7 @@ var restCmd = &cobra.Command{
 		}
 		defer func() {
 			if errClose := kafkaConsumerClient.Close(); errClose != nil {
-				log.Error(ctx, "error closing kafka client: %v", errClose)
+				log.Error(ctx, fmt.Sprintf("error closing update status client: %v", errClose))
 			}
 		}()
 
@@ -132,12 +132,12 @@ var restCmd = &cobra.Command{
 		if len(topics) > 0 {
 			client, err := sarama.NewConsumerGroup(brokers, groupID, kafkaConsumerConfig)
 			if err != nil {
-				log.Fatal(ctx, "Error creating consumer group client: %v", err)
+				log.Fatal(ctx, fmt.Sprintf("error creating consumer group client: %v", err))
 			}
 
 			defer func() {
 				if err := client.Close(); err != nil {
-					log.Error(ctx, "Error closing client: %v", err)
+					log.Error(ctx, fmt.Sprintf("error closing client: %v", err))
 				}
 			}()
 
@@ -158,14 +158,14 @@ var restCmd = &cobra.Command{
 				defer wg.Done()
 				defer func() {
 					if errClose := KafkaConsumerGroupID.Close(); errClose != nil {
-						log.Error(ctx, "error closing update status client: %v", errClose)
+						log.Error(ctx, fmt.Sprintf("error closing update status client: %v", errClose))
 					}
 				}()
 
 				for {
 					errKafkaConsumer := KafkaConsumerGroupID.Consume(ctx, topics, consumer)
 					if errKafkaConsumer != nil {
-						log.Error(ctx, "Error from consumer: %v", errKafkaConsumer)
+						log.Error(ctx, fmt.Sprintf("error from consumer: %v", errKafkaConsumer))
 						return
 					}
 
