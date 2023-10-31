@@ -6,6 +6,7 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	kafkaConfig "order-service/controllers/kafka/config"
 
 	"context"
 	"fmt"
@@ -28,7 +29,6 @@ import (
 	orderPaymentModel "order-service/domain/models/orderpayment"
 	subOrderModel "order-service/domain/models/suborder"
 
-	"order-service/cmd/kafka"
 	"order-service/config"
 	"order-service/migrations"
 	"order-service/utils/response"
@@ -141,9 +141,9 @@ var restCmd = &cobra.Command{
 				}
 			}()
 
-			consumer := kafka.NewConsumer()
+			consumer := kafkaConfig.NewConsumer()
 			kafkaRegistry := kafkaRegistry.NewKafkaRegistry(service)
-			kafkaConsumer := kafka.NewKafkaRouter(consumer, kafkaRegistry)
+			kafkaConsumer := kafkaConfig.NewKafkaRouter(consumer, kafkaRegistry)
 			kafkaConsumer.Register()
 
 			KafkaConsumerGroupID, errClient := sarama.NewConsumerGroupFromClient(

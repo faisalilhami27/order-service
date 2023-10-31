@@ -55,6 +55,7 @@ func (c *ConsumerGroup) Cleanup(sarama.ConsumerGroupSession) error {
 //nolint:gocognit,cyclop
 func (c *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	defer c.Recover()
+	ctx := context.Background()
 	messageChan := claim.Messages()
 
 	for {
@@ -69,8 +70,6 @@ func (c *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 				log.Errorf("No handler found for topic: %s", message.Topic)
 				continue
 			}
-
-			ctx := context.Background()
 
 			var requestID string
 			if ctx.Value(constant.XRequestID) != nil {
@@ -95,6 +94,7 @@ func (c *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 			for retries > 0 {
 				c.retryWg.Add(1)
 				go func(retries int) {
+					defer c.Recover()
 					defer c.retryWg.Done()
 					err = handler(ctx, message)
 				}(retries)
