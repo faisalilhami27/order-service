@@ -6,6 +6,7 @@ import (
 
 	errorValidation "order-service/utils/error"
 	"order-service/utils/response"
+	"order-service/utils/sentry"
 
 	"net/http"
 
@@ -22,23 +23,33 @@ type ISubOrderController interface {
 
 type ISubOrder struct {
 	serviceRegistry services.IServiceRegistry
+	sentry          sentry.ISentry
 }
 
-func NewOrderController(serviceRegistry services.IServiceRegistry) ISubOrderController {
+func NewOrderController(
+	serviceRegistry services.IServiceRegistry,
+	sentry sentry.ISentry,
+) ISubOrderController {
 	return &ISubOrder{
 		serviceRegistry: serviceRegistry,
+		sentry:          sentry,
 	}
 }
 
+//nolint:dupl
 func (o *ISubOrder) CreateOrder(c *gin.Context) {
+	const logCtx = "controllers.http.suborder.sub_order.CreateOrder"
 	var (
 		ctx     = c.Request.Context()
 		request = orderDTO.SubOrderRequest{}
+		span    = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
 		return
 	}
 
@@ -51,22 +62,27 @@ func (o *ISubOrder) CreateOrder(c *gin.Context) {
 
 	order, err := o.serviceRegistry.GetSubOrder().CreateOrder(ctx, &request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
 		return
 	}
 
 	c.JSON(http.StatusOK, response.ResponseSuccess(order))
 }
 
+//nolint:dupl
 func (o *ISubOrder) GetSubOrderList(c *gin.Context) {
+	const logCtx = "controllers.http.suborder.sub_order.GetSubOrderList"
 	var (
 		ctx     = c.Request.Context()
 		request = orderDTO.SubOrderRequestParam{}
+		span    = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	err := c.ShouldBindQuery(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
 		return
 	}
 
@@ -79,7 +95,7 @@ func (o *ISubOrder) GetSubOrderList(c *gin.Context) {
 
 	order, err := o.serviceRegistry.GetSubOrder().GetSubOrderList(ctx, &request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
 		return
 	}
 
@@ -87,14 +103,18 @@ func (o *ISubOrder) GetSubOrderList(c *gin.Context) {
 }
 
 func (o *ISubOrder) GetSubOrderDetail(c *gin.Context) {
+	const logCtx = "controllers.http.suborder.sub_order.GetSubOrderDetail"
 	var (
 		ctx       = c.Request.Context()
 		orderUUID = c.Param("uuid")
+		span      = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	order, err := o.serviceRegistry.GetSubOrder().GetOrderDetail(ctx, orderUUID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
 		return
 	}
 
@@ -102,14 +122,18 @@ func (o *ISubOrder) GetSubOrderDetail(c *gin.Context) {
 }
 
 func (o *ISubOrder) CancelOrder(c *gin.Context) {
+	const logCtx = "controllers.http.suborder.sub_order.CancelOrder"
 	var (
 		ctx       = c.Request.Context()
 		orderUUID = c.Param("uuid")
+		span      = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	err := o.serviceRegistry.GetSubOrder().Cancel(ctx, orderUUID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err))
+		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
 		return
 	}
 

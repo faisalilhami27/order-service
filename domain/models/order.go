@@ -19,4 +19,5 @@ type Order struct {
 	CreatedAt                  *time.Time
 	UpdatedAt                  *time.Time
 	DeletedAt                  *gorm.DeletedAt
+	SubOrder                   []SubOrder `gorm:"foreignKey:order_id;references:id;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"` //nolint:lll
 }

@@ -2,13 +2,15 @@ package response
 
 import (
 	"net/http"
+	"order-service/utils/sentry"
+
 	constant "order-service/constant/error"
 	errorValidation "order-service/utils/error"
 )
 
 type Response struct {
 	Status  string                               `json:"status"`
-	Message string                               `json:"message"`
+	Message any                                  `json:"message"`
 	Data    interface{}                          `json:"data,omitempty"`
 	Error   []errorValidation.ValidationResponse `json:"error,omitempty"`
 }
@@ -23,18 +25,11 @@ func ResponseSuccess(data interface{}) Response {
 }
 
 //nolint:revive
-func ResponseError(err error) Response {
+func ResponseError(err error, sentry sentry.ISentry) Response {
+	sentry.CaptureException(err)
 	return Response{
 		Status:  constant.Error,
 		Message: err.Error(),
-	}
-}
-
-//nolint:revive
-func ResponsePanicError(err any) Response {
-	return Response{
-		Status:  constant.Error,
-		Message: err.(string), //nolint:forcetypeassert
 	}
 }
 

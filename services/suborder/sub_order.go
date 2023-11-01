@@ -4,14 +4,14 @@ import (
 	"context"
 	"time"
 
+	"gorm.io/gorm"
+
 	"order-service/clients"
 	paymentClient "order-service/clients/payment"
 	rbacClient "order-service/clients/rbac"
 	errorGeneral "order-service/constant/error"
 	orderDTO "order-service/domain/dto/order"
-	orderModel "order-service/domain/models/order"
-
-	"gorm.io/gorm"
+	"order-service/utils/sentry"
 
 	"github.com/google/uuid"
 
@@ -20,7 +20,7 @@ import (
 	orderHistoryDTO "order-service/domain/dto/orderhistory"
 	orderPaymentDTO "order-service/domain/dto/orderpayment"
 	subOrderDTO "order-service/domain/dto/suborder"
-	subOrderModel "order-service/domain/models/suborder"
+	"order-service/domain/models"
 	"order-service/repositories"
 	"order-service/utils/helper"
 )
@@ -28,6 +28,7 @@ import (
 type ISubOrder struct {
 	repository repositories.IRepositoryRegistry
 	client     clients.IClientRegistry
+	sentry     sentry.ISentry
 }
 
 type ISubOrderService interface {
@@ -43,10 +44,12 @@ type ISubOrderService interface {
 func NewSubOrderService(
 	repository repositories.IRepositoryRegistry,
 	client clients.IClientRegistry,
+	sentry sentry.ISentry,
 ) ISubOrderService {
 	return &ISubOrder{
 		repository: repository,
 		client:     client,
+		sentry:     sentry,
 	}
 }
 
@@ -54,10 +57,15 @@ func (o *ISubOrder) GetSubOrderList(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequestParam,
 ) (*helper.PaginationResult, error) {
+	const logCtx = "services.suborder.sub_order.GetSubOrderList"
 	var (
-		orders []subOrderModel.SubOrder
+		orders []models.SubOrder
 		total  int64
+		span   = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	orders, total, err := o.repository.GetSubOrder().FindAllWithPagination(ctx, request)
 	if err != nil {
 		return nil, err
@@ -95,9 +103,13 @@ func (o *ISubOrder) GetSubOrderList(
 }
 
 func (o *ISubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*subOrderDTO.SubOrderResponse, error) {
+	const logCtx = "services.suborder.sub_order.GetOrderDetail"
 	var (
-		subOrder *subOrderModel.SubOrder
+		subOrder *models.SubOrder
+		span     = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	subOrder, err := o.repository.GetSubOrder().FindOneByUUID(ctx, subOrderUUID)
 	if err != nil {
@@ -126,10 +138,15 @@ func (o *ISubOrder) CreateOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
+	const logCtx = "services.suborder.sub_order.CreateOrder"
 	var (
 		response *subOrderDTO.SubOrderResponse
 		err      error
+		span     = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	switch request.PaymentType {
 	case constant.PTDownPayment:
 		response, err = o.createDownPaymentOrder(ctx, request)
@@ -150,16 +167,20 @@ func (o *ISubOrder) createDownPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
+	const logCtx = "services.suborder.sub_order.createDownPaymentOrder"
 	var (
-		subOrder         *subOrderModel.SubOrder
-		order            *orderModel.Order
+		subOrder         *models.SubOrder
+		order            *models.Order
 		txErr            error
 		paymentResponse  *paymentClient.PaymentData
 		customerResponse *rbacClient.RBACData
 		err              error
 		orderHistories   []orderHistoryDTO.OrderHistoryRequest
 		amount           float64 = 100000000 // will be remove if package service is ready
+		span                     = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	today := time.Now()
 	if today.After(request.OrderDate) {
@@ -173,13 +194,15 @@ func (o *ISubOrder) createDownPaymentOrder(
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		customerID, _ := uuid.Parse(request.CustomerID.String()) //nolint:errcheck
-		order, txErr = o.repository.GetOrder().FindOneOrderByCustomerIDWithLocking(ctx, customerID)
+		order, txErr = o.repository.GetOrder().FindOneOrderByCustomerIDWithLocking(ctx, tx, customerID)
 		if txErr != nil {
 			return txErr
 		}
 
 		if order != nil {
-			return errOrder.ErrPreviousOrderNotEmpty
+			if len(order.SubOrder) != 3 || order.CompletedAt == nil {
+				return errOrder.ErrPreviousOrderNotEmpty
+			}
 		}
 
 		order, txErr = o.repository.GetOrder().Create(ctx, tx, &orderDTO.OrderRequest{
@@ -191,7 +214,7 @@ func (o *ISubOrder) createDownPaymentOrder(
 			return txErr
 		}
 
-		subOrder, txErr = o.repository.GetSubOrder().Create(ctx, tx, &subOrderModel.SubOrder{
+		subOrder, txErr = o.repository.GetSubOrder().Create(ctx, tx, &models.SubOrder{
 			OrderID:     order.ID,
 			Status:      constant.Pending,
 			Amount:      request.Amount,
@@ -287,15 +310,19 @@ func (o *ISubOrder) createHalfPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
+	const logCtx = "services.suborder.sub_order.createHalfPaymentOrder"
 	var (
-		subOrder         *subOrderModel.SubOrder
-		order            *orderModel.Order
+		subOrder         *models.SubOrder
+		order            *models.Order
 		txErr            error
 		paymentResponse  *paymentClient.PaymentData
 		customerResponse *rbacClient.RBACData
 		err              error
 		orderHistories   []orderHistoryDTO.OrderHistoryRequest
+		span             = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	today := time.Now()
 	if today.After(request.OrderDate) {
@@ -315,13 +342,17 @@ func (o *ISubOrder) createHalfPaymentOrder(
 		FindOneByOrderIDAndPaymentType(
 			ctx,
 			order.ID,
-			constant.PTDownPayment.String())
+			constant.PTHalfPayment.String())
 	if err != nil {
 		return nil, err
 	}
 
-	if subOrder == nil {
-		return nil, errOrder.ErrHalfPaymentIsEmpty
+	if subOrder != nil {
+		if *subOrder.IsPaid {
+			return nil, errOrder.ErrHalfPaymentNotEmpty
+		} else { //nolint:revive
+			return nil, errOrder.ErrPreviousOrderNotEmpty
+		}
 	}
 
 	total := order.RemainingOutstandingAmount * 50 / 100
@@ -330,7 +361,7 @@ func (o *ISubOrder) createHalfPaymentOrder(
 	}
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error { //nolint:dupl
-		subOrder, txErr = o.repository.GetSubOrder().Create(ctx, tx, &subOrderModel.SubOrder{
+		subOrder, txErr = o.repository.GetSubOrder().Create(ctx, tx, &models.SubOrder{
 			OrderID:     order.ID,
 			Status:      constant.Pending,
 			Amount:      request.Amount,
@@ -426,15 +457,19 @@ func (o *ISubOrder) createFullPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
+	const logCtx = "services.suborder.sub_order.createFullPaymentOrder"
 	var (
-		subOrder         *subOrderModel.SubOrder
-		order            *orderModel.Order
+		subOrder         *models.SubOrder
+		order            *models.Order
 		txErr            error
 		paymentResponse  *paymentClient.PaymentData
 		customerResponse *rbacClient.RBACData
 		err              error
 		orderHistories   []orderHistoryDTO.OrderHistoryRequest
+		span             = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	today := time.Now()
 	if today.After(request.OrderDate) {
@@ -454,13 +489,17 @@ func (o *ISubOrder) createFullPaymentOrder(
 		FindOneByOrderIDAndPaymentType(
 			ctx,
 			order.ID,
-			constant.PTHalfPayment.String())
+			constant.PTFullPayment.String())
 	if err != nil {
 		return nil, err
 	}
 
-	if subOrder == nil {
-		return nil, errOrder.ErrInvalidFullAmount
+	if subOrder != nil {
+		if *subOrder.IsPaid {
+			return nil, errOrder.ErrFullPaymentNotEmpty
+		} else { //nolint:revive
+			return nil, errOrder.ErrPreviousOrderNotEmpty
+		}
 	}
 
 	total := order.RemainingOutstandingAmount - request.Amount
@@ -469,7 +508,7 @@ func (o *ISubOrder) createFullPaymentOrder(
 	}
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error { //nolint:dupl
-		subOrder, txErr = o.repository.GetSubOrder().Create(ctx, tx, &subOrderModel.SubOrder{
+		subOrder, txErr = o.repository.GetSubOrder().Create(ctx, tx, &models.SubOrder{
 			OrderID:     order.ID,
 			Status:      constant.Pending,
 			Amount:      request.Amount,
@@ -561,10 +600,14 @@ func (o *ISubOrder) createFullPaymentOrder(
 }
 
 func (o *ISubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
+	const logCtx = "services.suborder.sub_order.Cancel"
 	var (
-		order *subOrderModel.SubOrder
+		order *models.SubOrder
 		txErr error
+		span  = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	tx := o.repository.GetTx()
 	err := tx.Transaction(func(tx *gorm.DB) error {
@@ -581,7 +624,7 @@ func (o *ISubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
 		txErr = o.repository.GetSubOrder().Cancel(ctx, tx, &subOrderDTO.CancelRequest{
 			UUID:   uuidParse,
 			Status: constant.Cancelled,
-		}, &subOrderModel.SubOrder{
+		}, &models.SubOrder{
 			Status: order.Status,
 		})
 		if txErr != nil {
@@ -617,13 +660,17 @@ func (o *ISubOrder) processPayment(
 	request *subOrderDTO.PaymentRequest,
 	status constant.OrderStatus,
 ) error {
+	const logCtx = "services.suborder.sub_order.processPayment"
 	var (
 		updateRequest       subOrderDTO.UpdateSubOrderRequest
 		paidAt, completedAt *time.Time
 		isPaid              = false
-		order               *orderModel.Order
+		order               *models.Order
 		total               float64
+		span                = o.sentry.StartSpan(ctx, logCtx)
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
 
 	subOrder, err := o.repository.GetSubOrder().FindOneByUUID(ctx, request.OrderID.String())
 	if err != nil {
@@ -641,13 +688,15 @@ func (o *ISubOrder) processPayment(
 		case constant.PaymentSuccess:
 			isPaid = true
 			paidAt = request.PaidAt
+			completedAtTime := time.Now()
+			completedAt = &completedAtTime
 			total = order.RemainingOutstandingAmount - request.Amount
 			updateRequest = subOrderDTO.UpdateSubOrderRequest{
 				Status: constant.PaymentSuccess,
 				IsPaid: &isPaid,
 			}
 		case constant.Cancelled:
-			canceledAt := time.Now().UTC().Add(7 * time.Hour)
+			canceledAt := time.Now()
 			updateRequest = subOrderDTO.UpdateSubOrderRequest{
 				Status:     constant.Cancelled,
 				CanceledAt: &canceledAt,
@@ -660,7 +709,7 @@ func (o *ISubOrder) processPayment(
 			return errorGeneral.ErrStatus
 		}
 
-		txErr := o.repository.GetSubOrder().Update(ctx, tx, &updateRequest, &subOrderModel.SubOrder{
+		txErr := o.repository.GetSubOrder().Update(ctx, tx, &updateRequest, &models.SubOrder{
 			UUID:   subOrder.UUID,
 			Status: subOrder.Status,
 		})
@@ -693,11 +742,16 @@ func (o *ISubOrder) processPayment(
 		}
 
 		if request.Status == constant.PaymentStatusSettlement.String() {
-			txErr = o.repository.GetOrder().Update(ctx, tx, &orderDTO.OrderRequest{
+			updateOrder := &orderDTO.OrderRequest{
 				OrderID:                    order.UUID.String(),
 				RemainingOutstandingAmount: total,
-				CompletedAt:                completedAt,
-			})
+			}
+
+			if subOrder.PaymentType == constant.PTFullPayment {
+				updateOrder.CompletedAt = completedAt
+			}
+
+			txErr = o.repository.GetOrder().Update(ctx, tx, updateOrder)
 			if txErr != nil {
 				return txErr
 			}

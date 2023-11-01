@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"order-service/utils/sentry"
 	"strconv"
 	"time"
 
@@ -16,12 +17,13 @@ import (
 	errorGeneral "order-service/constant/error"
 	errOrder "order-service/constant/error/order"
 	subOrderDTO "order-service/domain/dto/suborder"
-	subOrderModel "order-service/domain/models/suborder"
+	subOrderModel "order-service/domain/models"
 	errorHelper "order-service/utils/error"
 )
 
 type ISubOrder struct {
-	db *gorm.DB
+	db     *gorm.DB
+	sentry sentry.ISentry
 }
 
 type ISubOrderRepository interface {
@@ -35,9 +37,10 @@ type ISubOrderRepository interface {
 	Update(context.Context, *gorm.DB, *subOrderDTO.UpdateSubOrderRequest, *subOrderModel.SubOrder) error
 }
 
-func NewSubOrder(db *gorm.DB) ISubOrderRepository {
+func NewSubOrder(db *gorm.DB, sentry sentry.ISentry) ISubOrderRepository {
 	return &ISubOrder{
-		db: db,
+		db:     db,
+		sentry: sentry,
 	}
 }
 
@@ -45,10 +48,15 @@ func (o *ISubOrder) FindAllWithPagination(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequestParam,
 ) ([]subOrderModel.SubOrder, int64, error) {
+	const logCtx = "repositories.suborder.sub_order.FindAllWithPagination"
 	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
 		order []subOrderModel.SubOrder
 		total int64
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	limit := request.Limit
 	offset := (request.Page - 1) * limit
 	err := o.db.WithContext(ctx).
@@ -61,21 +69,28 @@ func (o *ISubOrder) FindAllWithPagination(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, 0, errOrder.ErrOrderNotFound
 		}
-		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 
 	err = o.db.WithContext(ctx).
 		Model(&order).
 		Count(&total).Error
 	if err != nil {
-		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, 0, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 
 	return order, total, nil
 }
 
 func (o *ISubOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*subOrderModel.SubOrder, error) {
-	var order subOrderModel.SubOrder
+	const logCtx = "repositories.suborder.sub_order.FindOneByUUID"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := o.db.WithContext(ctx).
 		Preload("Payment").
 		Where("uuid = ?", orderUUID).
@@ -84,7 +99,7 @@ func (o *ISubOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*subOr
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errOrder.ErrOrderNotFound
 		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
@@ -94,18 +109,24 @@ func (o *ISubOrder) FindOneByOrderIDAndPaymentType(
 	orderID uint,
 	paymentType string,
 ) (*subOrderModel.SubOrder, error) {
-	var order subOrderModel.SubOrder
+	const logCtx = "repositories.suborder.sub_order.FindOneByOrderIDAndPaymentType"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := o.db.WithContext(ctx).
 		InnerJoins("INNER JOIN order_payments op ON op.sub_order_id = sub_orders.id").
 		Where("sub_orders.payment_type = ?", paymentType).
 		Where("order_id = ?", orderID).
-		Where("paid_at IS NOT NULL").
 		First(&order).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errOrder.ErrOrderNotFound
+			return nil, nil
 		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
@@ -114,7 +135,14 @@ func (o *ISubOrder) FindOneSubOrderByCustomerIDWithLocking(
 	ctx context.Context,
 	customerID uuid.UUID,
 ) (*subOrderModel.SubOrder, error) {
-	var order subOrderModel.SubOrder
+	const logCtx = "repositories.suborder.sub_order.FindOneSubOrderByCustomerIDWithLocking"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := o.db.WithContext(ctx).
 		Where("customer_id = ?", customerID).
 		Where("completed_at IS NULL").
@@ -126,7 +154,7 @@ func (o *ISubOrder) FindOneSubOrderByCustomerIDWithLocking(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
@@ -136,13 +164,21 @@ func (o *ISubOrder) Create(
 	tx *gorm.DB,
 	request *subOrderModel.SubOrder,
 ) (*subOrderModel.SubOrder, error) {
+	const logCtx = "repositories.suborder.sub_order.Create"
+	var (
+		span     = o.sentry.StartSpan(ctx, logCtx)
+		subOrder subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	isPaid := false
 	subOrderName, err := o.autoNumber(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	subOrder := subOrderModel.SubOrder{
+	subOrder = subOrderModel.SubOrder{
 		UUID:         uuid.New(),
 		SubOrderName: *subOrderName,
 		OrderID:      request.OrderID,
@@ -164,7 +200,7 @@ func (o *ISubOrder) Create(
 
 	err = tx.WithContext(ctx).Create(&subOrder).Error
 	if err != nil {
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &subOrder, nil
 }
@@ -174,6 +210,14 @@ func (o *ISubOrder) BulkCreate(
 	tx *gorm.DB,
 	requests []subOrderModel.SubOrder,
 ) ([]subOrderModel.SubOrder, error) {
+	const logCtx = "repositories.suborder.sub_order.BulkCreate"
+	var (
+		span     = o.sentry.StartSpan(ctx, logCtx)
+		subOrder subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	isPaid := false
 	subOrderName, err := o.autoNumber(ctx)
 	if err != nil {
@@ -182,7 +226,7 @@ func (o *ISubOrder) BulkCreate(
 
 	subOrders := make([]subOrderModel.SubOrder, 0, len(requests))
 	for _, request := range requests {
-		subOrder := subOrderModel.SubOrder{
+		subOrder = subOrderModel.SubOrder{
 			UUID:         uuid.New(),
 			SubOrderName: *subOrderName,
 			OrderID:      request.OrderID,
@@ -206,7 +250,7 @@ func (o *ISubOrder) BulkCreate(
 
 	err = tx.WithContext(ctx).Create(&subOrders).Error
 	if err != nil {
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 
 	return subOrders, nil
@@ -218,10 +262,15 @@ func (o *ISubOrder) Cancel(
 	request *subOrderDTO.CancelRequest,
 	current *subOrderModel.SubOrder,
 ) error {
+	const logCtx = "repositories.suborder.sub_order.Cancel"
 	var (
+		span       = o.sentry.StartSpan(ctx, logCtx)
 		canceledAt = time.Now()
 		order      subOrderModel.SubOrder
 	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	order = subOrderModel.SubOrder{
 		CanceledAt: &canceledAt,
 	}
@@ -243,7 +292,7 @@ func (o *ISubOrder) Cancel(
 			CanceledAt: &canceledAt,
 		}).Error
 	if err != nil {
-		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return nil
 }
@@ -257,7 +306,7 @@ func (o *ISubOrder) autoNumber(ctx context.Context) (*string, error) {
 	err := o.db.WithContext(ctx).Order("id desc").First(&subOrder).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+			return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 		}
 	}
 
@@ -279,7 +328,15 @@ func (o *ISubOrder) Update(
 	request *subOrderDTO.UpdateSubOrderRequest,
 	current *subOrderModel.SubOrder,
 ) error {
-	subOrder := subOrderModel.SubOrder{
+	const logCtx = "repositories.suborder.sub_order.Update"
+	var (
+		span     = o.sentry.StartSpan(ctx, logCtx)
+		subOrder subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
+	subOrder = subOrderModel.SubOrder{
 		Status:     request.Status,
 		IsPaid:     request.IsPaid,
 		CanceledAt: request.CanceledAt,
@@ -298,7 +355,7 @@ func (o *ISubOrder) Update(
 		Where("uuid = ?", current.UUID).
 		Updates(&subOrder).Error
 	if err != nil {
-		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return nil
 }

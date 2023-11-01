@@ -2,6 +2,7 @@ package error
 
 import (
 	"fmt"
+	"order-service/utils/sentry"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -125,7 +126,8 @@ func ErrorValidationResponse(err error) (validationResponses []ValidationRespons
 	return validationResponses
 }
 
-func WrapError(err error) error {
+func WrapError(err error, sentry sentry.ISentry) error {
+	sentry.CaptureException(err)
 	log.Errorf("error: %+v\n", err)
 	return err
 }

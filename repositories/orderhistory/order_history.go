@@ -2,18 +2,20 @@ package repositories
 
 import (
 	"context"
+	orderHistoryModel "order-service/domain/models"
+	"order-service/utils/sentry"
 	"time"
 
 	"gorm.io/gorm"
 
 	errorGeneral "order-service/constant/error"
 	orderHistoryDTO "order-service/domain/dto/orderhistory"
-	orderHistoryModel "order-service/domain/models/orderhistory"
 	errorHelper "order-service/utils/error"
 )
 
 type IOrderHistory struct {
-	db *gorm.DB
+	db     *gorm.DB
+	sentry sentry.ISentry
 }
 
 type IOrderHistoryRepository interface {
@@ -21,17 +23,26 @@ type IOrderHistoryRepository interface {
 	BulkCreate(context.Context, *gorm.DB, []orderHistoryDTO.OrderHistoryRequest) error
 }
 
-func NewOrderHistory(db *gorm.DB) IOrderHistoryRepository {
+func NewOrderHistory(db *gorm.DB, sentry sentry.ISentry) IOrderHistoryRepository {
 	return &IOrderHistory{
-		db: db,
+		db:     db,
+		sentry: sentry,
 	}
 }
 
 func (o *IOrderHistory) Create(ctx context.Context, tx *gorm.DB, request *orderHistoryDTO.OrderHistoryRequest) error {
+	const logCtx = "repositories.orderhistory.order_history.Create"
+	var (
+		span         = o.sentry.StartSpan(ctx, logCtx)
+		orderHistory orderHistoryModel.OrderHistory
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	location, _ := time.LoadLocation("Asia/Jakarta") //nolint:errcheck
 	datetime := time.Now().In(location)
 
-	orderHistory := orderHistoryModel.OrderHistory{
+	orderHistory = orderHistoryModel.OrderHistory{
 		SubOrderID: request.SubOrderID,
 		Status:     request.Status,
 		CreatedAt:  &datetime,
@@ -39,7 +50,7 @@ func (o *IOrderHistory) Create(ctx context.Context, tx *gorm.DB, request *orderH
 	}
 	err := tx.WithContext(ctx).Create(&orderHistory).Error
 	if err != nil {
-		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return nil
 }
@@ -49,6 +60,13 @@ func (o *IOrderHistory) BulkCreate(
 	tx *gorm.DB,
 	requests []orderHistoryDTO.OrderHistoryRequest,
 ) error {
+	const logCtx = "repositories.orderhistory.order_history.BulkCreate"
+	var (
+		span = o.sentry.StartSpan(ctx, logCtx)
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	location, _ := time.LoadLocation("Asia/Jakarta") //nolint:errcheck
 	datetime := time.Now().In(location)
 
@@ -65,7 +83,7 @@ func (o *IOrderHistory) BulkCreate(
 
 	err := tx.WithContext(ctx).Create(&orderHistoryRequest).Error
 	if err != nil {
-		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 
 	return nil

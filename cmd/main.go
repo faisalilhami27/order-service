@@ -6,7 +6,6 @@ import (
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	kafkaConfig "order-service/controllers/kafka/config"
 
 	"context"
 	"fmt"
@@ -24,10 +23,10 @@ import (
 	routeRegistry "order-service/routes"
 	serviceRegistry "order-service/services"
 
-	orderModel "order-service/domain/models/order"
-	orderHistoryModel "order-service/domain/models/orderhistory"
-	orderPaymentModel "order-service/domain/models/orderpayment"
-	subOrderModel "order-service/domain/models/suborder"
+	kafkaConfig "order-service/controllers/kafka/config"
+
+	"order-service/domain/models"
+	"order-service/utils/sentry"
 
 	"order-service/config"
 	"order-service/migrations"
@@ -61,19 +60,28 @@ var restCmd = &cobra.Command{
 
 		// Database Auto Migration from model
 		err = db.AutoMigrate(
-			&orderModel.Order{},
-			&subOrderModel.SubOrder{},
-			&orderHistoryModel.OrderHistory{},
-			&orderPaymentModel.OrderPayment{},
+			&models.Order{},
+			&models.SubOrder{},
+			&models.OrderHistory{},
+			&models.OrderPayment{},
 		)
 		if err != nil {
 			panic(err)
 		}
 
+		// Sentry for error tracking
+		sentry := sentry.NewSentry(
+			sentry.WithDsn(config.Config.SentryDsn),
+			sentry.WithDebug(config.Config.AppDebug),
+			sentry.WithEnv(config.Config.AppEnv),
+			sentry.WithSampleRate(config.Config.SentrySampleRate),
+			sentry.WithEnableTracing(config.Config.SentryEnableTracing),
+		)
+
 		client := clientRegistry.NewClientRegistry()
-		repository := repositoryRegistry.NewRepositoryRegistry(db)
-		service := serviceRegistry.NewServiceRegistry(repository, client)
-		controller := controllerRegistry.NewControllerRegistry(service)
+		repository := repositoryRegistry.NewRepositoryRegistry(db, sentry)
+		service := serviceRegistry.NewServiceRegistry(repository, client, sentry)
+		controller := controllerRegistry.NewControllerRegistry(service, sentry)
 
 		router := gin.Default()
 		router.NoRoute(func(c *gin.Context) {

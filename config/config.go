@@ -15,6 +15,7 @@ type AppConfig struct {
 	Port                               int             `json:"port" yaml:"port"`
 	AppName                            string          `json:"appName" yaml:"appName"`
 	AppEnv                             string          `json:"appEnv" yaml:"appEnv"`
+	AppDebug                           bool            `json:"appDebug" yaml:"appDebug"`
 	SignatureKey                       string          `json:"signatureKey" yaml:"signatureKey"`
 	Database                           Database        `json:"database" yaml:"database"`
 	InternalService                    InternalService `json:"internalService" yaml:"internalService"`
@@ -30,6 +31,9 @@ type AppConfig struct {
 	KafkaConsumerBackoffTimeInMs       int32           `json:"kafkaConsumerBackoffTimeInMs" yaml:"kafkaConsumerBackoffTimeMs"`       //nolint:lll
 	KafkaConsumerTopics                []string        `json:"kafkaConsumerStatusTopics" yaml:"kafkaConsumerTopics"`
 	KafkaConsumerGroupID               string          `json:"kafkaConsumerGroupID" yaml:"kafkaConsumerGroupID"`
+	SentryDsn                          string          `json:"sentryDsn" yaml:"sentryDsn"`
+	SentrySampleRate                   float64         `json:"sentrySampleRate" yaml:"sentrySampleRate"`
+	SentryEnableTracing                bool            `json:"SentryEnableTracing" yaml:"SentryEnableTracing"`
 }
 
 type Database struct {

@@ -6,6 +6,8 @@
 # Log files
 *.log
 
+tmp
+
 # JetBrains IDE
 .idea/
 

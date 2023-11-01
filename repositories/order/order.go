@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"order-service/utils/sentry"
 	"strconv"
 	"time"
 
@@ -14,12 +15,13 @@ import (
 
 	errorGeneral "order-service/constant/error"
 	orderDTO "order-service/domain/dto/order"
-	orderModel "order-service/domain/models/order"
+	orderModel "order-service/domain/models"
 	errorHelper "order-service/utils/error"
 )
 
 type IOrder struct {
-	db *gorm.DB
+	db     *gorm.DB
+	sentry sentry.ISentry
 }
 
 type IOrderRepository interface {
@@ -27,26 +29,34 @@ type IOrderRepository interface {
 	DeleteByOrderID(context.Context, *gorm.DB, uint) error
 	FindOneOrderByUUID(context.Context, uuid.UUID) (*orderModel.Order, error)
 	FindOneOrderByID(context.Context, uint) (*orderModel.Order, error)
-	FindOneOrderByCustomerIDWithLocking(context.Context, uuid.UUID) (*orderModel.Order, error)
+	FindOneOrderByCustomerIDWithLocking(context.Context, *gorm.DB, uuid.UUID) (*orderModel.Order, error)
 	Update(ctx context.Context, db *gorm.DB, request *orderDTO.OrderRequest) error
 }
 
-func NewOrder(db *gorm.DB) IOrderRepository {
+func NewOrder(db *gorm.DB, sentry sentry.ISentry) IOrderRepository {
 	return &IOrder{
-		db: db,
+		db:     db,
+		sentry: sentry,
 	}
 }
 
 func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 	ctx context.Context,
+	tx *gorm.DB,
 	customerID uuid.UUID,
 ) (*orderModel.Order, error) {
-	var order orderModel.Order
-	err := o.db.WithContext(ctx).
-		InnerJoins("INNER JOIN sub_orders ON sub_orders.order_id = orders.id").
-		InnerJoins("INNER JOIN order_payments ON order_payments.sub_order_id = sub_orders.id").
-		Where("order_payments.paid_at IS NULL AND sub_orders.canceled_at IS NULL").
-		Where("customer_id = ?", customerID).
+	const logCtx = "repositories.order.order.FindOneOrderByCustomerIDWithLocking"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order orderModel.Order
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
+	err := tx.WithContext(ctx).
+		Preload("SubOrder").
+		Where("customer_idddd = ?", customerID).
+		Where("completed_at IS NULL").
 		Order("id DESC").
 		Clauses(clause.Locking{Strength: "UPDATE"}).
 		First(&order).Error
@@ -54,7 +64,7 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
@@ -63,7 +73,14 @@ func (o *IOrder) FindOneOrderByUUID(
 	ctx context.Context,
 	uuid uuid.UUID,
 ) (*orderModel.Order, error) {
-	var order orderModel.Order
+	const logCtx = "repositories.order.order.FindOneOrderByUUID"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order orderModel.Order
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := o.db.WithContext(ctx).
 		Where("uuid = ?", uuid).
 		Order("id DESC").
@@ -72,7 +89,7 @@ func (o *IOrder) FindOneOrderByUUID(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
@@ -81,7 +98,14 @@ func (o *IOrder) FindOneOrderByID(
 	ctx context.Context,
 	id uint,
 ) (*orderModel.Order, error) {
-	var order orderModel.Order
+	const logCtx = "repositories.order.order.FindOneOrderByID"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order orderModel.Order
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := o.db.WithContext(ctx).
 		Where("id = ?", id).
 		Order("id DESC").
@@ -90,12 +114,20 @@ func (o *IOrder) FindOneOrderByID(
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
 
 func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.OrderRequest) (*orderModel.Order, error) {
+	const logCtx = "repositories.order.order.Create"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order orderModel.Order
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	location, _ := time.LoadLocation("Asia/Jakarta") //nolint:errcheck
 	datetime := time.Now().In(location)
 	orderName, err := o.autoNumber(ctx)
@@ -103,7 +135,7 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		return nil, err
 	}
 
-	order := orderModel.Order{
+	order = orderModel.Order{
 		UUID:                       uuid.New(),
 		OrderName:                  *orderName,
 		RemainingOutstandingAmount: request.RemainingOutstandingAmount,
@@ -112,24 +144,41 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		CreatedAt:                  &datetime,
 		UpdatedAt:                  &datetime,
 	}
-	err = tx.WithContext(ctx).Create(&order).Error
+	err = tx.WithContext(ctx).
+		Model(&orderModel.Order{}).
+		Create(&order).Error
 	if err != nil {
-		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
 }
 
 func (o *IOrder) DeleteByOrderID(ctx context.Context, tx *gorm.DB, orderID uint) error {
+	const logCtx = "repositories.order.order.DeleteByOrderID"
+	var (
+		span = o.sentry.StartSpan(ctx, logCtx)
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := tx.WithContext(ctx).
+		Model(&orderModel.Order{}).
 		Where("uuid = ?", orderID).
 		Delete(&orderModel.Order{}).Error
 	if err != nil {
-		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return nil
 }
 
 func (o *IOrder) Update(ctx context.Context, tx *gorm.DB, request *orderDTO.OrderRequest) error {
+	const logCtx = "repositories.order.order.Update"
+	var (
+		span = o.sentry.StartSpan(ctx, logCtx)
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
 	err := tx.WithContext(ctx).
 		Model(&orderModel.Order{}).
 		Where("uuid = ?", request.OrderID).
@@ -138,7 +187,7 @@ func (o *IOrder) Update(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 			"completed_at":                 request.CompletedAt,
 		}).Error
 	if err != nil {
-		return errorHelper.WrapError(errorGeneral.ErrSQLError)
+		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return nil
 }
@@ -152,7 +201,7 @@ func (o *IOrder) autoNumber(ctx context.Context) (*string, error) {
 	err := o.db.WithContext(ctx).Order("id desc").First(&order).Error
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errorHelper.WrapError(errorGeneral.ErrSQLError)
+			return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 		}
 	}
 

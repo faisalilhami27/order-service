@@ -2,14 +2,9 @@ package models
 
 import (
 	"github.com/google/uuid"
-
 	"gorm.io/gorm"
 
 	"order-service/constant"
-	orderModel "order-service/domain/models/order"
-	orderHistoryModel "order-service/domain/models/orderhistory"
-	orderPaymentModel "order-service/domain/models/orderpayment"
-
 	"time"
 )
 
@@ -24,9 +19,9 @@ type SubOrder struct {
 	OrderDate    time.Time            `gorm:"not null"`
 	CanceledAt   *time.Time
 	PaymentType  constant.PaymentType
-	Order        orderModel.Order                 `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Payment      orderPaymentModel.OrderPayment   `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Histories    []orderHistoryModel.OrderHistory `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Order        Order          `gorm:"foreignKey:order_id;references:id;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Payment      OrderPayment   `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Histories    []OrderHistory `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	CreatedAt    *time.Time
 	UpdatedAt    *time.Time
 	DeletedAt    *gorm.DeletedAt

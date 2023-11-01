@@ -28,6 +28,7 @@ func NewRouteRegistry(
 }
 
 func (r *Route) Serve() {
+	r.Route.Use(middlewares.ValidateAPIKey())
 	r.Route.Use(middlewares.HandlePanic)
 	r.suOrderRoute().Run()
 }
