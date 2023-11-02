@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	errorResp "order-service/utils/error"
+	"order-service/utils/sentry"
 
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
@@ -18,15 +20,20 @@ const PaymentTopic = "payment-service-callback"
 
 type PaymentKafka struct {
 	service serviceRegistry.IServiceRegistry
+	sentry  sentry.ISentry
 }
 
 type IPaymentKafka interface {
 	HandlePayment(ctx context.Context, message *sarama.ConsumerMessage) error
 }
 
-func NewPaymentKafka(service serviceRegistry.IServiceRegistry) IPaymentKafka {
+func NewPaymentKafka(
+	service serviceRegistry.IServiceRegistry,
+	sentry sentry.ISentry,
+) IPaymentKafka {
 	return &PaymentKafka{
 		service: service,
+		sentry:  sentry,
 	}
 }
 
@@ -75,7 +82,7 @@ func (p *PaymentKafka) HandlePayment(ctx context.Context, message *sarama.Consum
 		})
 	}
 	if err != nil {
-		return err
+		return errorResp.WrapError(err, p.sentry)
 	}
 	return nil
 }

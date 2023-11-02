@@ -1,43 +1,49 @@
 package response
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"net/http"
-	"order-service/utils/sentry"
 
 	constant "order-service/constant/error"
-	errorValidation "order-service/utils/error"
+	"order-service/utils/sentry"
 )
 
 type Response struct {
-	Status  string                               `json:"status"`
-	Message any                                  `json:"message"`
-	Data    interface{}                          `json:"data,omitempty"`
-	Error   []errorValidation.ValidationResponse `json:"error,omitempty"`
+	Status  string      `json:"status"`
+	Message any         `json:"message"`
+	Data    interface{} `json:"data,omitempty"`
 }
 
-//nolint:revive
-func ResponseSuccess(data interface{}) Response {
-	return Response{
-		Status:  constant.Success,
-		Message: "OK",
-		Data:    data,
+type ParamHTTPResp struct {
+	Code    int
+	Err     error
+	Message *string
+	Gin     *gin.Context
+	Data    interface{}
+	Sentry  sentry.ISentry
+}
+
+func HTTPResponse(param ParamHTTPResp) {
+	if param.Err == nil {
+		param.Gin.JSON(param.Code, Response{
+			Status:  constant.Success,
+			Message: http.StatusText(http.StatusOK),
+			Data:    param.Data,
+		})
+		return
 	}
-}
 
-//nolint:revive
-func ResponseError(err error, sentry sentry.ISentry) Response {
-	sentry.CaptureException(err)
-	return Response{
+	var message = param.Err.Error()
+	if param.Message != nil {
+		message = *param.Message
+	}
+
+	param.Gin.JSON(param.Code, Response{
 		Status:  constant.Error,
-		Message: err.Error(),
-	}
-}
-
-//nolint:revive
-func ResponseErrorValidation(response []errorValidation.ValidationResponse) Response {
-	return Response{
-		Status:  constant.Error,
-		Message: http.StatusText(http.StatusUnprocessableEntity),
-		Error:   response,
-	}
+		Message: message,
+		Data:    param.Data,
+	})
+	param.Sentry.CaptureException(param.Err)
+	return //nolint:gosimple
 }

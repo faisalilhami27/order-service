@@ -55,7 +55,7 @@ func (o *IOrder) FindOneOrderByCustomerIDWithLocking(
 
 	err := tx.WithContext(ctx).
 		Preload("SubOrder").
-		Where("customer_idddd = ?", customerID).
+		Where("customer_id = ?", customerID).
 		Where("completed_at IS NULL").
 		Order("id DESC").
 		Clauses(clause.Locking{Strength: "UPDATE"}).

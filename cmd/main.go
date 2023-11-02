@@ -150,7 +150,7 @@ var restCmd = &cobra.Command{
 			}()
 
 			consumer := kafkaConfig.NewConsumer()
-			kafkaRegistry := kafkaRegistry.NewKafkaRegistry(service)
+			kafkaRegistry := kafkaRegistry.NewKafkaRegistry(service, sentry)
 			kafkaConsumer := kafkaConfig.NewKafkaRouter(consumer, kafkaRegistry)
 			kafkaConsumer.Register()
 

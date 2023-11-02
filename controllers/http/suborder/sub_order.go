@@ -49,24 +49,47 @@ func (o *ISubOrder) CreateOrder(c *gin.Context) {
 
 	err := c.ShouldBindJSON(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Code:   http.StatusBadRequest,
+			Err:    err,
+			Gin:    c,
+			Sentry: o.sentry,
+		})
 		return
 	}
 
 	validate := validator.New()
-	if err := validate.Struct(request); err != nil {
+	if err = validate.Struct(request); err != nil {
+		errMessage := http.StatusText(http.StatusUnprocessableEntity)
 		errorResponse := errorValidation.ErrorValidationResponse(err)
-		c.JSON(http.StatusUnprocessableEntity, response.ResponseErrorValidation(errorResponse))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Err:     err,
+			Code:    http.StatusUnprocessableEntity,
+			Message: &errMessage,
+			Data:    errorResponse,
+			Sentry:  o.sentry,
+			Gin:     c,
+		})
 		return
 	}
 
 	order, err := o.serviceRegistry.GetSubOrder().CreateOrder(ctx, &request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Code:   http.StatusBadRequest,
+			Err:    err,
+			Gin:    c,
+			Sentry: o.sentry,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, response.ResponseSuccess(order))
+	response.HTTPResponse(response.ParamHTTPResp{
+		Code: http.StatusOK,
+		Data: order,
+		Err:  err,
+		Gin:  c,
+	})
 }
 
 //nolint:dupl
@@ -82,24 +105,47 @@ func (o *ISubOrder) GetSubOrderList(c *gin.Context) {
 
 	err := c.ShouldBindQuery(&request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Code:   http.StatusBadRequest,
+			Err:    err,
+			Gin:    c,
+			Sentry: o.sentry,
+		})
 		return
 	}
 
 	validate := validator.New()
-	if err := validate.Struct(request); err != nil {
+	if err = validate.Struct(request); err != nil {
+		errMessage := http.StatusText(http.StatusUnprocessableEntity)
 		errorResponse := errorValidation.ErrorValidationResponse(err)
-		c.JSON(http.StatusUnprocessableEntity, response.ResponseErrorValidation(errorResponse))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Err:     err,
+			Code:    http.StatusUnprocessableEntity,
+			Message: &errMessage,
+			Data:    errorResponse,
+			Sentry:  o.sentry,
+			Gin:     c,
+		})
 		return
 	}
 
 	order, err := o.serviceRegistry.GetSubOrder().GetSubOrderList(ctx, &request)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Code:   http.StatusBadRequest,
+			Err:    err,
+			Gin:    c,
+			Sentry: o.sentry,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, response.ResponseSuccess(order))
+	response.HTTPResponse(response.ParamHTTPResp{
+		Code: http.StatusOK,
+		Data: order,
+		Err:  err,
+		Gin:  c,
+	})
 }
 
 func (o *ISubOrder) GetSubOrderDetail(c *gin.Context) {
@@ -114,11 +160,21 @@ func (o *ISubOrder) GetSubOrderDetail(c *gin.Context) {
 
 	order, err := o.serviceRegistry.GetSubOrder().GetOrderDetail(ctx, orderUUID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Code:   http.StatusBadRequest,
+			Err:    err,
+			Gin:    c,
+			Sentry: o.sentry,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, response.ResponseSuccess(order))
+	response.HTTPResponse(response.ParamHTTPResp{
+		Code: http.StatusOK,
+		Data: order,
+		Err:  err,
+		Gin:  c,
+	})
 }
 
 func (o *ISubOrder) CancelOrder(c *gin.Context) {
@@ -133,9 +189,19 @@ func (o *ISubOrder) CancelOrder(c *gin.Context) {
 
 	err := o.serviceRegistry.GetSubOrder().Cancel(ctx, orderUUID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.ResponseError(err, o.sentry))
+		response.HTTPResponse(response.ParamHTTPResp{
+			Code:   http.StatusBadRequest,
+			Err:    err,
+			Gin:    c,
+			Sentry: o.sentry,
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, response.ResponseSuccess(nil))
+	response.HTTPResponse(response.ParamHTTPResp{
+		Code: http.StatusOK,
+		Data: nil,
+		Err:  err,
+		Gin:  c,
+	})
 }
