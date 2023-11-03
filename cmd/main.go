@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"github.com/IBM/sarama"
+	"github.com/didip/tollbooth"
+	"github.com/didip/tollbooth/limiter"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	log "github.com/sirupsen/logrus"
@@ -29,6 +31,7 @@ import (
 	"order-service/common/sentry"
 	"order-service/config"
 	"order-service/domain/models"
+	"order-service/middlewares"
 	"order-service/migrations"
 	"order-service/utils/response"
 )
@@ -98,6 +101,14 @@ var restCmd = &cobra.Command{
 			})
 		})
 
+		lmt := tollbooth.NewLimiter(
+			config.Config.RateLimiterMaxRequest,
+			&limiter.ExpirableOptions{
+				DefaultExpirationTTL: time.Duration(config.Config.RateLimiterTimeSecond) * time.Second,
+			},
+		)
+		router.Use(middlewares.RateLimiter(lmt))
+		router.Use(middlewares.ValidateAPIKey())
 		router.Use(func(c *gin.Context) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH")

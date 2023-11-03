@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/didip/tollbooth"
+	"github.com/didip/tollbooth/limiter"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
@@ -46,6 +48,21 @@ func ValidateAPIKey() gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, response.Response{
 				Status:  constantError.Error,
 				Message: newError,
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
+func RateLimiter(lmt *limiter.Limiter) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := tollbooth.LimitByRequest(lmt, c.Writer, c.Request)
+		if err != nil {
+			c.JSON(http.StatusTooManyRequests, response.Response{
+				Status:  constantError.Error,
+				Message: constantError.ErrTooManyRequest.Error(),
 			})
 			c.Abort()
 			return

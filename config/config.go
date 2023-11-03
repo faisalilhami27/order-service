@@ -36,6 +36,8 @@ type AppConfig struct {
 	SentryEnableTracing                bool            `json:"SentryEnableTracing" yaml:"SentryEnableTracing"`
 	CircuitBreakerMaxRequest           uint32          `json:"circuitBreakerMaxRequest" yaml:"circuitBreakerMaxRequest"`
 	CircuitBreakerTimeoutInSecond      uint32          `json:"circuitBreakerTimeoutInSecond" yaml:"circuitBreakerTimeoutInSecond"` //nolint:lll
+	RateLimiterMaxRequest              float64         `json:"rateLimiterMaxRequest" yaml:"rateLimiterMaxRequest"`
+	RateLimiterTimeSecond              int             `json:"rateLimiterTimeSecond" yaml:"rateLimiterTimeSecond"`
 }
 
 type Database struct {
