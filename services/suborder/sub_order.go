@@ -6,14 +6,15 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/google/uuid"
+
 	"order-service/clients"
 	paymentClient "order-service/clients/payment"
 	rbacClient "order-service/clients/rbac"
+	"order-service/common/circuitbreaker"
+	"order-service/common/sentry"
 	errorGeneral "order-service/constant/error"
 	orderDTO "order-service/domain/dto/order"
-	"order-service/utils/sentry"
-
-	"github.com/google/uuid"
 
 	"order-service/constant"
 	errOrder "order-service/constant/error/order"
@@ -25,10 +26,11 @@ import (
 	"order-service/utils/helper"
 )
 
-type ISubOrder struct {
+type SubOrder struct {
 	repository repositories.IRepositoryRegistry
 	client     clients.IClientRegistry
 	sentry     sentry.ISentry
+	breaker    circuitbreaker.ICircuitBreaker
 }
 
 type ISubOrderService interface {
@@ -45,15 +47,17 @@ func NewSubOrderService(
 	repository repositories.IRepositoryRegistry,
 	client clients.IClientRegistry,
 	sentry sentry.ISentry,
+	breaker circuitbreaker.ICircuitBreaker,
 ) ISubOrderService {
-	return &ISubOrder{
+	return &SubOrder{
 		repository: repository,
 		client:     client,
 		sentry:     sentry,
+		breaker:    breaker,
 	}
 }
 
-func (o *ISubOrder) GetSubOrderList(
+func (o *SubOrder) GetSubOrderList(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequestParam,
 ) (*helper.PaginationResult, error) {
@@ -66,28 +70,29 @@ func (o *ISubOrder) GetSubOrderList(
 	ctx = o.sentry.SpanContext(span)
 	defer o.sentry.Finish(span)
 
-	orders, total, err := o.repository.GetSubOrder().FindAllWithPagination(ctx, request)
+	subOrders, total, err := o.repository.GetSubOrder().FindAllWithPagination(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
 	orderResponses := make([]subOrderDTO.SubOrderResponse, 0, len(orders))
-	for _, order := range orders {
+	for _, subOrder := range subOrders {
 		orderResponses = append(orderResponses, subOrderDTO.SubOrderResponse{
-			UUID:         order.UUID,
-			SubOrderName: order.SubOrderName,
-			CustomerID:   order.Order.CustomerID,
-			PackageID:    order.Order.PackageID,
-			Amount:       order.Amount,
-			Status:       order.Status,
-			IsPaid:       order.IsPaid,
-			CreatedAt:    order.CreatedAt,
-			UpdatedAt:    order.UpdatedAt,
+			OrderID:      subOrder.Order.UUID,
+			SubOrderID:   subOrder.UUID,
+			SubOrderName: subOrder.SubOrderName,
+			CustomerID:   subOrder.Order.CustomerID,
+			PackageID:    subOrder.Order.PackageID,
+			Amount:       subOrder.Amount,
+			Status:       subOrder.Status,
+			IsPaid:       subOrder.IsPaid,
+			CreatedAt:    subOrder.CreatedAt,
+			UpdatedAt:    subOrder.UpdatedAt,
 			Payment: &orderPaymentDTO.OrderPaymentResponse{
-				PaymentID:   order.Payment.PaymentID,
-				InvoiceID:   order.Payment.InvoiceID,
-				PaymentLink: *order.Payment.PaymentURL,
-				Status:      order.Payment.Status,
+				PaymentID:   subOrder.Payment.PaymentID,
+				InvoiceID:   subOrder.Payment.InvoiceID,
+				PaymentLink: *subOrder.Payment.PaymentURL,
+				Status:      subOrder.Payment.Status,
 			},
 		})
 	}
@@ -102,7 +107,7 @@ func (o *ISubOrder) GetSubOrderList(
 	return &response, nil
 }
 
-func (o *ISubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*subOrderDTO.SubOrderResponse, error) {
+func (o *SubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*subOrderDTO.SubOrderResponse, error) {
 	const logCtx = "services.suborder.sub_order.GetOrderDetail"
 	var (
 		subOrder *models.SubOrder
@@ -117,7 +122,8 @@ func (o *ISubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*s
 	}
 
 	response := &subOrderDTO.SubOrderResponse{
-		UUID:         subOrder.UUID,
+		OrderID:      subOrder.Order.UUID,
+		SubOrderID:   subOrder.UUID,
 		SubOrderName: subOrder.SubOrderName,
 		CustomerID:   subOrder.Order.CustomerID,
 		PackageID:    subOrder.Order.PackageID,
@@ -134,7 +140,7 @@ func (o *ISubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*s
 	return response, nil
 }
 
-func (o *ISubOrder) CreateOrder(
+func (o *SubOrder) CreateOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
@@ -162,8 +168,8 @@ func (o *ISubOrder) CreateOrder(
 	return response, err
 }
 
-//nolint:cyclop
-func (o *ISubOrder) createDownPaymentOrder(
+//nolint:cyclop,gocognit
+func (o *SubOrder) createDownPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
@@ -205,8 +211,25 @@ func (o *ISubOrder) createDownPaymentOrder(
 			}
 		}
 
+		rbacRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			customerResponse, txErr = o.client.GetRBAC().GetUserRBAC(ctx, request.CustomerID.String())
+			if txErr != nil {
+				return nil, txErr
+			}
+
+			return customerResponse, nil
+		})
+
+		txErr = o.breaker.Execute(ctx, rbacRequest)
+		if txErr != nil {
+			return txErr
+		}
+
 		order, txErr = o.repository.GetOrder().Create(ctx, tx, &orderDTO.OrderRequest{
 			CustomerID:                 request.CustomerID.String(),
+			CustomerName:               customerResponse.Name,
+			CustomerEmail:              customerResponse.Email,
+			CustomerPhone:              customerResponse.PhoneNumber,
 			PackageID:                  request.PackageID.String(),
 			RemainingOutstandingAmount: amount,
 		})
@@ -236,31 +259,22 @@ func (o *ISubOrder) createDownPaymentOrder(
 			return txErr
 		}
 
-		customerResponse, txErr = o.client.GetRBAC().GetUserRBAC(request.CustomerID.String())
-		if txErr != nil {
-			return txErr
-		}
-
 		expiredAt := time.Now().Add(24 * time.Hour)
-		paymentResponse, txErr = o.client.GetPayment().CreatePaymentLink(&paymentClient.PaymentRequest{
-			OrderID:     subOrder.UUID,
-			ExpiredAt:   expiredAt,
-			Amount:      request.Amount,
-			Description: request.PaymentType.Title(),
-			CustomerDetail: paymentClient.CustomerDetail{
-				Name:  customerResponse.Name,
-				Email: customerResponse.Email,
-				Phone: customerResponse.PhoneNumber,
-			},
-			ItemDetail: []paymentClient.ItemDetail{
-				{
-					ID:       uuid.New(),
-					Name:     request.PaymentType.Title(),
-					Amount:   request.Amount,
-					Quantity: 1,
-				},
-			},
+		paymentRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			paymentResponse, txErr = o.generatePaymentLink(
+				ctx,
+				subOrder,
+				order,
+				request,
+				expiredAt,
+			)
+			if txErr != nil {
+				return nil, txErr
+			}
+
+			return paymentResponse, nil
 		})
+		txErr = o.breaker.Execute(ctx, paymentRequest)
 		if txErr != nil {
 			return txErr
 		}
@@ -287,7 +301,8 @@ func (o *ISubOrder) createDownPaymentOrder(
 	}
 
 	response := subOrderDTO.SubOrderResponse{
-		UUID:         subOrder.UUID,
+		OrderID:      order.UUID,
+		SubOrderID:   subOrder.UUID,
 		SubOrderName: subOrder.SubOrderName,
 		CustomerID:   order.CustomerID,
 		PackageID:    order.PackageID,
@@ -306,20 +321,19 @@ func (o *ISubOrder) createDownPaymentOrder(
 }
 
 //nolint:cyclop
-func (o *ISubOrder) createHalfPaymentOrder(
+func (o *SubOrder) createHalfPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
 	const logCtx = "services.suborder.sub_order.createHalfPaymentOrder"
 	var (
-		subOrder         *models.SubOrder
-		order            *models.Order
-		txErr            error
-		paymentResponse  *paymentClient.PaymentData
-		customerResponse *rbacClient.RBACData
-		err              error
-		orderHistories   []orderHistoryDTO.OrderHistoryRequest
-		span             = o.sentry.StartSpan(ctx, logCtx)
+		subOrder        *models.SubOrder
+		order           *models.Order
+		txErr           error
+		paymentResponse *paymentClient.PaymentData
+		err             error
+		orderHistories  []orderHistoryDTO.OrderHistoryRequest
+		span            = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
 	defer o.sentry.Finish(span)
@@ -383,31 +397,22 @@ func (o *ISubOrder) createHalfPaymentOrder(
 			return txErr
 		}
 
-		customerResponse, txErr = o.client.GetRBAC().GetUserRBAC(request.CustomerID.String())
-		if txErr != nil {
-			return txErr
-		}
-
 		expiredAt := time.Now().Add(24 * time.Hour)
-		paymentResponse, txErr = o.client.GetPayment().CreatePaymentLink(&paymentClient.PaymentRequest{
-			OrderID:     subOrder.UUID,
-			ExpiredAt:   expiredAt,
-			Amount:      request.Amount,
-			Description: request.PaymentType.Title(),
-			CustomerDetail: paymentClient.CustomerDetail{
-				Name:  customerResponse.Name,
-				Email: customerResponse.Email,
-				Phone: customerResponse.PhoneNumber,
-			},
-			ItemDetail: []paymentClient.ItemDetail{
-				{
-					ID:       uuid.New(),
-					Name:     request.PaymentType.Title(),
-					Amount:   request.Amount,
-					Quantity: 1,
-				},
-			},
+		paymentRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			paymentResponse, txErr = o.generatePaymentLink(
+				ctx,
+				subOrder,
+				order,
+				request,
+				expiredAt,
+			)
+			if txErr != nil {
+				return nil, txErr
+			}
+
+			return paymentResponse, nil
 		})
+		txErr = o.breaker.Execute(ctx, paymentRequest)
 		if txErr != nil {
 			return txErr
 		}
@@ -434,7 +439,8 @@ func (o *ISubOrder) createHalfPaymentOrder(
 	}
 
 	response := subOrderDTO.SubOrderResponse{
-		UUID:         subOrder.UUID,
+		OrderID:      order.UUID,
+		SubOrderID:   subOrder.UUID,
 		SubOrderName: subOrder.SubOrderName,
 		CustomerID:   order.CustomerID,
 		PackageID:    order.PackageID,
@@ -453,20 +459,19 @@ func (o *ISubOrder) createHalfPaymentOrder(
 }
 
 //nolint:cyclop
-func (o *ISubOrder) createFullPaymentOrder(
+func (o *SubOrder) createFullPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
 ) (*subOrderDTO.SubOrderResponse, error) {
 	const logCtx = "services.suborder.sub_order.createFullPaymentOrder"
 	var (
-		subOrder         *models.SubOrder
-		order            *models.Order
-		txErr            error
-		paymentResponse  *paymentClient.PaymentData
-		customerResponse *rbacClient.RBACData
-		err              error
-		orderHistories   []orderHistoryDTO.OrderHistoryRequest
-		span             = o.sentry.StartSpan(ctx, logCtx)
+		subOrder        *models.SubOrder
+		order           *models.Order
+		txErr           error
+		paymentResponse *paymentClient.PaymentData
+		err             error
+		orderHistories  []orderHistoryDTO.OrderHistoryRequest
+		span            = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
 	defer o.sentry.Finish(span)
@@ -530,31 +535,22 @@ func (o *ISubOrder) createFullPaymentOrder(
 			return txErr
 		}
 
-		customerResponse, txErr = o.client.GetRBAC().GetUserRBAC(request.CustomerID.String())
-		if txErr != nil {
-			return txErr
-		}
-
 		expiredAt := time.Now().Add(24 * time.Hour)
-		paymentResponse, txErr = o.client.GetPayment().CreatePaymentLink(&paymentClient.PaymentRequest{
-			OrderID:     subOrder.UUID,
-			ExpiredAt:   expiredAt,
-			Amount:      request.Amount,
-			Description: request.PaymentType.Title(),
-			CustomerDetail: paymentClient.CustomerDetail{
-				Name:  customerResponse.Name,
-				Email: customerResponse.Email,
-				Phone: customerResponse.PhoneNumber,
-			},
-			ItemDetail: []paymentClient.ItemDetail{
-				{
-					ID:       uuid.New(),
-					Name:     request.PaymentType.Title(),
-					Amount:   request.Amount,
-					Quantity: 1,
-				},
-			},
+		paymentRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			paymentResponse, txErr = o.generatePaymentLink(
+				ctx,
+				subOrder,
+				order,
+				request,
+				expiredAt,
+			)
+			if txErr != nil {
+				return nil, txErr
+			}
+
+			return paymentResponse, nil
 		})
+		txErr = o.breaker.Execute(ctx, paymentRequest)
 		if txErr != nil {
 			return txErr
 		}
@@ -581,7 +577,8 @@ func (o *ISubOrder) createFullPaymentOrder(
 	}
 
 	response := subOrderDTO.SubOrderResponse{
-		UUID:         subOrder.UUID,
+		OrderID:      order.UUID,
+		SubOrderID:   subOrder.UUID,
 		SubOrderName: subOrder.SubOrderName,
 		CustomerID:   order.CustomerID,
 		PackageID:    order.PackageID,
@@ -599,7 +596,40 @@ func (o *ISubOrder) createFullPaymentOrder(
 	return &response, nil
 }
 
-func (o *ISubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
+func (o *SubOrder) generatePaymentLink(
+	ctx context.Context,
+	subOrder *models.SubOrder,
+	order *models.Order,
+	request *subOrderDTO.SubOrderRequest,
+	expiredAt time.Time,
+) (*paymentClient.PaymentData, error) {
+	paymentResponse, err := o.client.GetPayment().CreatePaymentLink(ctx, &paymentClient.PaymentRequest{
+		OrderID:     subOrder.UUID,
+		ExpiredAt:   expiredAt,
+		Amount:      request.Amount,
+		Description: request.PaymentType.Title(),
+		CustomerDetail: paymentClient.CustomerDetail{
+			Name:  order.CustomerName,
+			Email: order.CustomerEmail,
+			Phone: order.CustomerPhone,
+		},
+		ItemDetail: []paymentClient.ItemDetail{
+			{
+				ID:       uuid.New(),
+				Name:     request.PaymentType.Title(),
+				Amount:   request.Amount,
+				Quantity: 1,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return paymentResponse, nil
+}
+
+func (o *SubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
 	const logCtx = "services.suborder.sub_order.Cancel"
 	var (
 		order *models.SubOrder
@@ -655,7 +685,7 @@ func (o *ISubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
 }
 
 //nolint:cyclop
-func (o *ISubOrder) processPayment(
+func (o *SubOrder) processPayment(
 	ctx context.Context,
 	request *subOrderDTO.PaymentRequest,
 	status constant.OrderStatus,
@@ -766,14 +796,14 @@ func (o *ISubOrder) processPayment(
 	return nil
 }
 
-func (o *ISubOrder) ReceivePendingPayment(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
+func (o *SubOrder) ReceivePendingPayment(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
 	return o.processPayment(ctx, request, constant.PendingPayment)
 }
 
-func (o *ISubOrder) ReceivePaymentSettlement(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
+func (o *SubOrder) ReceivePaymentSettlement(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
 	return o.processPayment(ctx, request, constant.PaymentSuccess)
 }
 
-func (o *ISubOrder) ReceivePaymentExpire(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
+func (o *SubOrder) ReceivePaymentExpire(ctx context.Context, request *subOrderDTO.PaymentRequest) error {
 	return o.processPayment(ctx, request, constant.Cancelled)
 }

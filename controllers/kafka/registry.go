@@ -1,9 +1,9 @@
 package controllers
 
 import (
+	"order-service/common/sentry"
 	paymentKafka "order-service/controllers/kafka/payment"
 	serviceRegistry "order-service/services"
-	"order-service/utils/sentry"
 )
 
 type Registry struct {

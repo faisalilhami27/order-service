@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"order-service/utils/sentry"
+	"order-service/common/sentry"
 	"strconv"
 	"time"
 
@@ -140,6 +140,9 @@ func (o *IOrder) Create(ctx context.Context, tx *gorm.DB, request *orderDTO.Orde
 		OrderName:                  *orderName,
 		RemainingOutstandingAmount: request.RemainingOutstandingAmount,
 		CustomerID:                 request.CustomerID,
+		CustomerName:               request.CustomerName,
+		CustomerEmail:              request.CustomerEmail,
+		CustomerPhone:              request.CustomerPhone,
 		PackageID:                  request.PackageID,
 		CreatedAt:                  &datetime,
 		UpdatedAt:                  &datetime,

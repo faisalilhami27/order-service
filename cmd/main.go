@@ -25,10 +25,10 @@ import (
 
 	kafkaConfig "order-service/controllers/kafka/config"
 
-	"order-service/domain/models"
-	"order-service/utils/sentry"
-
+	"order-service/common/circuitbreaker"
+	"order-service/common/sentry"
 	"order-service/config"
+	"order-service/domain/models"
 	"order-service/migrations"
 	"order-service/utils/response"
 )
@@ -78,9 +78,16 @@ var restCmd = &cobra.Command{
 			sentry.WithEnableTracing(config.Config.SentryEnableTracing),
 		)
 
-		client := clientRegistry.NewClientRegistry()
+		// Circuit Breaker
+		circuitBreaker := circuitbreaker.NewCircuitBreaker(
+			sentry,
+			circuitbreaker.WithMaxRequest(config.Config.CircuitBreakerMaxRequest),
+			circuitbreaker.WithTimeout(config.Config.CircuitBreakerTimeoutInSecond),
+		)
+
+		client := clientRegistry.NewClientRegistry(sentry)
 		repository := repositoryRegistry.NewRepositoryRegistry(db, sentry)
-		service := serviceRegistry.NewServiceRegistry(repository, client, sentry)
+		service := serviceRegistry.NewServiceRegistry(repository, client, sentry, circuitBreaker)
 		controller := controllerRegistry.NewControllerRegistry(service, sentry)
 
 		router := gin.Default()

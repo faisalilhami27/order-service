@@ -4,11 +4,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 
+	"net/http"
+
+	"order-service/common/sentry"
 	errorValidation "order-service/utils/error"
 	"order-service/utils/response"
-	"order-service/utils/sentry"
-
-	"net/http"
 
 	orderDTO "order-service/domain/dto/suborder"
 	"order-service/services"

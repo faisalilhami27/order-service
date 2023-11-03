@@ -34,6 +34,8 @@ type AppConfig struct {
 	SentryDsn                          string          `json:"sentryDsn" yaml:"sentryDsn"`
 	SentrySampleRate                   float64         `json:"sentrySampleRate" yaml:"sentrySampleRate"`
 	SentryEnableTracing                bool            `json:"SentryEnableTracing" yaml:"SentryEnableTracing"`
+	CircuitBreakerMaxRequest           uint32          `json:"circuitBreakerMaxRequest" yaml:"circuitBreakerMaxRequest"`
+	CircuitBreakerTimeoutInSecond      uint32          `json:"circuitBreakerTimeoutInSecond" yaml:"circuitBreakerTimeoutInSecond"` //nolint:lll
 }
 
 type Database struct {

@@ -53,7 +53,8 @@ type SubOrderRequestParam struct {
 }
 
 type SubOrderResponse struct {
-	UUID         uuid.UUID                             `json:"orderID"`
+	OrderID      uuid.UUID                             `json:"orderID"`
+	SubOrderID   uuid.UUID                             `json:"subOrderID"`
 	SubOrderName string                                `json:"subOrderName"`
 	CustomerID   string                                `json:"customerID"`
 	PackageID    string                                `json:"packageID"`

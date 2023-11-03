@@ -1,33 +1,42 @@
 package clients
 
 import (
+	"context"
 	"fmt"
-
 	"net/http"
+	"time"
 
 	clientConfig "order-service/clients/config"
+	"order-service/common/sentry"
 	"order-service/config"
 	"order-service/constant"
 	"order-service/utils/helper"
-
-	"time"
 )
 
 type IRbac struct {
 	client clientConfig.IClientConfig
+	sentry sentry.ISentry
 }
 
 type IRbacClient interface {
-	GetUserRBAC(string) (*RBACData, error)
+	GetUserRBAC(context.Context, string) (*RBACData, error)
 }
 
-func NewRBACClient(client clientConfig.IClientConfig) IRbacClient {
+func NewRBACClient(sentry sentry.ISentry, client clientConfig.IClientConfig) IRbacClient {
 	return &IRbac{
 		client: client,
+		sentry: sentry,
 	}
 }
 
-func (i *IRbac) GetUserRBAC(uuid string) (*RBACData, error) {
+func (i *IRbac) GetUserRBAC(ctx context.Context, uuid string) (*RBACData, error) {
+	logCtx := "common.clients.rbac.rbac.GetUserRBAC"
+	var (
+		span = i.sentry.StartSpan(ctx, logCtx)
+	)
+	i.sentry.SpanContext(span)
+	defer i.sentry.Finish(span)
+
 	unixTime := time.Now().Unix()
 	generateAPIKey := fmt.Sprintf("%s:%s:%d",
 		config.Config.AppName,

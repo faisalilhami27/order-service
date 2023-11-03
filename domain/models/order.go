@@ -13,6 +13,9 @@ type Order struct {
 	UUID                       uuid.UUID `gorm:"type:varchar(36);unique;not null"`
 	OrderName                  string    `gorm:"type:varchar(20);unique;not null"`
 	CustomerID                 string    `gorm:"type:varchar(36);not null"`
+	CustomerName               string    `gorm:"type:varchar(100);not null"`
+	CustomerEmail              string    `gorm:"type:varchar(70);not null"`
+	CustomerPhone              string    `gorm:"type:varchar(20);not null"`
 	PackageID                  string    `gorm:"type:varchar(36);not null"`
 	RemainingOutstandingAmount float64   `gorm:"null;type:numeric(15,2)"`
 	CompletedAt                *time.Time

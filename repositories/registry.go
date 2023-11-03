@@ -3,7 +3,7 @@ package repositories
 import (
 	"gorm.io/gorm"
 
-	"order-service/utils/sentry"
+	"order-service/common/sentry"
 
 	orderRepo "order-service/repositories/order"
 	orderHistoryRepo "order-service/repositories/orderhistory"

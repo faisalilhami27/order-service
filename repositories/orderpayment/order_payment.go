@@ -2,8 +2,8 @@ package repositories
 
 import (
 	"context"
+	"order-service/common/sentry"
 	orderPaymentModel "order-service/domain/models"
-	"order-service/utils/sentry"
 	"time"
 
 	"gorm.io/gorm"

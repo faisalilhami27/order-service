@@ -1,9 +1,9 @@
 package controllers
 
 import (
+	"order-service/common/sentry"
 	orderRoute "order-service/controllers/http/suborder"
 	serviceRegistry "order-service/services"
-	"order-service/utils/sentry"
 )
 
 type IControllerRegistry interface {

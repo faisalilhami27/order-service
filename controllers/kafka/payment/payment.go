@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	errorResp "order-service/utils/error"
-	"order-service/utils/sentry"
 
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+
+	"order-service/common/sentry"
+	errorResp "order-service/utils/error"
 
 	dto "order-service/domain/dto/kafka/payment"
 	paymentDTO "order-service/domain/dto/suborder"

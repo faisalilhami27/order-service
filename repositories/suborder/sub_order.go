@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"order-service/utils/sentry"
+	"order-service/common/sentry"
 	"strconv"
 	"time"
 
@@ -93,6 +93,7 @@ func (o *ISubOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*subOr
 
 	err := o.db.WithContext(ctx).
 		Preload("Payment").
+		Preload("Order").
 		Where("uuid = ?", orderUUID).
 		First(&order).Error
 	if err != nil {

@@ -5,8 +5,8 @@ import (
 
 	"net/http"
 
+	"order-service/common/sentry"
 	constant "order-service/constant/error"
-	"order-service/utils/sentry"
 )
 
 type Response struct {

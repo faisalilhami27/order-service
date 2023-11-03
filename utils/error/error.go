@@ -2,7 +2,7 @@ package error
 
 import (
 	"fmt"
-	"order-service/utils/sentry"
+	"order-service/common/sentry"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
