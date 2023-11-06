@@ -5,11 +5,12 @@ package mocks
 import (
 	context "context"
 	dto "order-service/domain/dto/suborder"
-	"order-service/domain/models"
 
 	gorm "gorm.io/gorm"
 
 	mock "github.com/stretchr/testify/mock"
+
+	models "order-service/domain/models"
 
 	uuid "github.com/google/uuid"
 )

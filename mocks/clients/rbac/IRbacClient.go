@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	context "context"
 	clients "order-service/clients/rbac"
 
 	mock "github.com/stretchr/testify/mock"
@@ -13,25 +14,25 @@ type IRbacClient struct {
 	mock.Mock
 }
 
-// GetUserRBAC provides a mock function with given fields: _a0
-func (_m *IRbacClient) GetUserRBAC(_a0 string) (*clients.RBACData, error) {
-	ret := _m.Called(_a0)
+// GetUserRBAC provides a mock function with given fields: _a0, _a1
+func (_m *IRbacClient) GetUserRBAC(_a0 context.Context, _a1 string) (*clients.RBACData, error) {
+	ret := _m.Called(_a0, _a1)
 
 	var r0 *clients.RBACData
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string) (*clients.RBACData, error)); ok {
-		return rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*clients.RBACData, error)); ok {
+		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(string) *clients.RBACData); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, string) *clients.RBACData); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*clients.RBACData)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(string) error); ok {
-		r1 = rf(_a0)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
 	}

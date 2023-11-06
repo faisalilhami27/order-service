@@ -5,11 +5,12 @@ package mocks
 import (
 	context "context"
 	dto "order-service/domain/dto/order"
-	"order-service/domain/models"
 
 	gorm "gorm.io/gorm"
 
 	mock "github.com/stretchr/testify/mock"
+
+	models "order-service/domain/models"
 
 	uuid "github.com/google/uuid"
 )
@@ -59,25 +60,25 @@ func (_m *IOrderRepository) DeleteByOrderID(_a0 context.Context, _a1 *gorm.DB, _
 	return r0
 }
 
-// FindOneOrderByCustomerIDWithLocking provides a mock function with given fields: _a0, _a1
-func (_m *IOrderRepository) FindOneOrderByCustomerIDWithLocking(_a0 context.Context, _a1 uuid.UUID) (*models.Order, error) {
-	ret := _m.Called(_a0, _a1)
+// FindOneOrderByCustomerIDWithLocking provides a mock function with given fields: _a0, _a1, _a2
+func (_m *IOrderRepository) FindOneOrderByCustomerIDWithLocking(_a0 context.Context, _a1 *gorm.DB, _a2 uuid.UUID) (*models.Order, error) {
+	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 *models.Order
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (*models.Order, error)); ok {
-		return rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *gorm.DB, uuid.UUID) (*models.Order, error)); ok {
+		return rf(_a0, _a1, _a2)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) *models.Order); ok {
-		r0 = rf(_a0, _a1)
+	if rf, ok := ret.Get(0).(func(context.Context, *gorm.DB, uuid.UUID) *models.Order); ok {
+		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*models.Order)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
-		r1 = rf(_a0, _a1)
+	if rf, ok := ret.Get(1).(func(context.Context, *gorm.DB, uuid.UUID) error); ok {
+		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
 	}

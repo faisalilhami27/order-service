@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	packageClient "order-service/clients/package"
 	"time"
 
 	"gorm.io/gorm"
@@ -180,6 +181,7 @@ func (o *SubOrder) createDownPaymentOrder(
 		txErr            error
 		paymentResponse  *paymentClient.PaymentData
 		customerResponse *rbacClient.RBACData
+		packageResponse  *packageClient.PackageData
 		err              error
 		orderHistories   []orderHistoryDTO.OrderHistoryRequest
 		amount           float64 = 100000000 // will be remove if package service is ready
@@ -193,12 +195,26 @@ func (o *SubOrder) createDownPaymentOrder(
 		return nil, errorGeneral.ErrOrderDate
 	}
 
-	total := amount * 10 / 100
-	if total != request.Amount {
-		return nil, errOrder.ErrInvalidDownAmount
-	}
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error {
+		packageRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			packageResponse, txErr = o.client.GetPackage().GetDetailPackage(ctx, request.PackageID.String())
+			if txErr != nil {
+				return nil, txErr
+			}
+
+			return packageResponse, nil
+		})
+		txErr = o.breaker.Execute(ctx, packageRequest)
+		if txErr != nil {
+			return txErr
+		}
+
+		total := float64(packageResponse.Price) * 10 / 100
+		if total != request.Amount {
+			return errOrder.ErrInvalidDownAmount
+		}
+
 		customerID, _ := uuid.Parse(request.CustomerID.String()) //nolint:errcheck
 		order, txErr = o.repository.GetOrder().FindOneOrderByCustomerIDWithLocking(ctx, tx, customerID)
 		if txErr != nil {
