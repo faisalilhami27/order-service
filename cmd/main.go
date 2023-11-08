@@ -108,6 +108,12 @@ var restCmd = &cobra.Command{
 			},
 		)
 		router.Use(middlewares.RateLimiter(lmt))
+		router.GET("/", func(c *gin.Context) {
+			c.JSON(http.StatusOK, response.Response{
+				Status:  "success",
+				Message: "Welcome to Order Service",
+			})
+		})
 		router.Use(middlewares.ValidateAPIKey())
 		router.Use(func(c *gin.Context) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
