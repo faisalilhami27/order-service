@@ -3,6 +3,7 @@ package helper
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -154,10 +155,26 @@ func GenerateSHA256(inputString string) string {
 	return hashString
 }
 
-func HandlePanic() {
-	if r := recover(); r != nil {
-		log.SetLevel(log.ErrorLevel)
-		log.Errorf("error occured: %v", r)
-		return
+func ConvertToIndonesianMonth(englishMonth string) string {
+	monthMap := map[string]string{
+		"January":   "Januari",
+		"February":  "Februari",
+		"March":     "Maret",
+		"April":     "April",
+		"May":       "Mei",
+		"June":      "Juni",
+		"July":      "Juli",
+		"August":    "Agustus",
+		"September": "September",
+		"October":   "Oktober",
+		"November":  "November",
+		"December":  "Desember",
 	}
+
+	indonesianMonth, found := monthMap[englishMonth]
+	if !found {
+		return errors.New("month not found").Error() //nolint:goerr113
+	}
+
+	return indonesianMonth
 }

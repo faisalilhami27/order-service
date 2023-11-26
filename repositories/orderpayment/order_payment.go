@@ -2,11 +2,14 @@ package repositories
 
 import (
 	"context"
-	"order-service/common/sentry"
-	orderPaymentModel "order-service/domain/models"
-	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+
+	"order-service/common/sentry"
+	orderPaymentModel "order-service/domain/models"
+
+	"time"
 
 	errorGeneral "order-service/constant/error"
 	orderPaymentDTO "order-service/domain/dto/orderpayment"
@@ -21,6 +24,7 @@ type IOrderPayment struct {
 type IOrderPaymentRepository interface {
 	Create(context.Context, *gorm.DB, *orderPaymentDTO.OrderPaymentRequest) error
 	Update(context.Context, *gorm.DB, *orderPaymentDTO.OrderPaymentRequest) error
+	FindByPaymentID(context.Context, *gorm.DB, string) (*orderPaymentModel.OrderPayment, error)
 }
 
 func NewOrderPayment(db *gorm.DB, sentry sentry.ISentry) IOrderPaymentRepository {
@@ -49,7 +53,6 @@ func (o *IOrderPayment) Create(
 	orderPayment = orderPaymentModel.OrderPayment{
 		Amount:      request.Amount,
 		SubOrderID:  request.SubOrderID,
-		InvoiceID:   request.InvoiceID,
 		PaymentID:   request.PaymentID,
 		PaymentURL:  &request.PaymentLink,
 		PaymentType: request.PaymentType,
@@ -100,4 +103,27 @@ func (o *IOrderPayment) Update(
 		return errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return nil
+}
+
+func (o *IOrderPayment) FindByPaymentID(
+	ctx context.Context,
+	tx *gorm.DB,
+	paymentID string,
+) (*orderPaymentModel.OrderPayment, error) {
+	const logCtx = "repositories.orderpayment.order_payment.Update"
+	var (
+		span         = o.sentry.StartSpan(ctx, logCtx)
+		orderPayment orderPaymentModel.OrderPayment
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
+	err := tx.WithContext(ctx).
+		Where("payment_id = ?", paymentID).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		First(&orderPayment).Error
+	if err != nil {
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
+	}
+	return &orderPayment, nil
 }

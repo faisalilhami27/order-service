@@ -11,7 +11,6 @@ type OrderPayment struct {
 	Amount      float64
 	SubOrderID  uint
 	PaymentID   uuid.UUID
-	InvoiceID   uuid.UUID
 	PaymentURL  *string
 	Status      *string
 	PaidAt      *time.Time

@@ -2,6 +2,7 @@ package clients
 
 import (
 	clientConfig "order-service/clients/config"
+	invoiceClient "order-service/clients/invoice"
 	packageClient "order-service/clients/package"
 	paymentClient "order-service/clients/payment"
 	rbacClient "order-service/clients/rbac"
@@ -17,6 +18,7 @@ type IClientRegistry interface {
 	GetPayment() paymentClient.IPaymentClient
 	GetRBAC() rbacClient.IRbacClient
 	GetPackage() packageClient.IPackageClient
+	GetInvoice() invoiceClient.IInvoiceClient
 }
 
 func NewClientRegistry(sentry sentry.ISentry) IClientRegistry {
@@ -49,5 +51,14 @@ func (c *Client) GetPackage() packageClient.IPackageClient {
 		clientConfig.NewClientConfig(
 			clientConfig.WithBaseURL(config.Config.InternalService.Package.Host),
 			clientConfig.WithSecretKey(config.Config.InternalService.Package.SecretKey),
+		))
+}
+
+func (c *Client) GetInvoice() invoiceClient.IInvoiceClient {
+	return invoiceClient.NewInvoiceClient(
+		c.sentry,
+		clientConfig.NewClientConfig(
+			clientConfig.WithBaseURL(config.Config.InternalService.Invoice.Host),
+			clientConfig.WithSecretKey(config.Config.InternalService.Invoice.SecretKey),
 		))
 }

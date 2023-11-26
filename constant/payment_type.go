@@ -2,6 +2,7 @@ package constant
 
 type PaymentType string
 type PaymentTypeTitle string
+type PaymentTypeIndonesianTitle string
 
 const (
 	PTDownPayment PaymentType = "down_payment"
@@ -11,6 +12,10 @@ const (
 	PTDownPaymentTitle PaymentTypeTitle = "Down Payment"
 	PTHalfPaymentTitle PaymentTypeTitle = "50% Payment"
 	PTFullPaymentTitle PaymentTypeTitle = "100% Payment"
+
+	PTDownPaymentIndonesianTitle PaymentTypeIndonesianTitle = "Pembayaran Uang Muka"
+	PTHalfPaymentIndonesianTitle PaymentTypeIndonesianTitle = "Pembayaran 50%"
+	PTFullPaymentIndonesianTitle PaymentTypeIndonesianTitle = "Pembayaran 100%"
 )
 
 var mapPaymentTypeToTitle = map[PaymentType]PaymentTypeTitle{
@@ -20,6 +25,10 @@ var mapPaymentTypeToTitle = map[PaymentType]PaymentTypeTitle{
 }
 
 func (pt PaymentType) String() string {
+	return string(pt)
+}
+
+func (pt PaymentTypeIndonesianTitle) String() string {
 	return string(pt)
 }
 

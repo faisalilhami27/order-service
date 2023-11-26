@@ -2,18 +2,62 @@
   "port": 8002,
   "appName": "order-service",
   "appEnv": "development",
-  "signatureKey": "wo_order_key_25062023)$%*$)(*)%*$(%",
+  "appDebug": true,
+  "signatureKey": "",
 
   "database": {
-    "host": "host.docker.internal",
+    "host": "localhost",
     "port": 5432,
-    "name": "wo_order",
-    "username": "root",
-    "password": "barca1899",
+    "name": "",
+    "username": "",
+    "password": "",
     "maxOpenConnection": 10,
     "maxLifetimeConnection": 10,
     "maxIdleConnection": 10,
     "maxIdleTime": 10,
     "autoMigrate": false
+  },
+
+  "rateLimiterMaxRequest": 5,
+  "rateLimiterTimeSecond": 5,
+
+  "circuitBreakerMaxRequest": 5,
+  "circuitBreakerTimeoutInSecond": 5,
+
+  "sentryDsn": "",
+  "sentrySampleRate": 0.2,
+  "sentryEnableTracing": true,
+
+  "kafkaHosts": ["localhost:9092"],
+  "kafkaTimeoutInMs": 100,
+  "kafkaMaxRetry": 3,
+  "kafkaProducerTopic": "payment-service-callback",
+
+  "kafkaConsumerFetchDefault": 5,
+  "kafkaConsumerFetchMin": 1,
+  "kafkaConsumerFetchMax": 10,
+  "kafkaConsumerMaxWaitTimeInMs": 100,
+  "kafkaConsumerMaxProcessingTimeInMs": 200,
+  "kafkaConsumerBackoffTimeInMs": 100,
+  "kafkaConsumerTopics": ["payment-service-callback"],
+  "kafkaConsumerGroupID": "consumer-group-local",
+
+  "internalService": {
+    "rbac": {
+      "host": "http://localhost:8003",
+      "secretKey": ""
+    },
+    "payment": {
+      "host": "http://localhost:8004",
+      "secretKey": ""
+    },
+    "package": {
+      "host": "http://localhost:8005",
+      "secretKey": ""
+    },
+    "invoice": {
+      "host": "http://localhost:8006",
+      "secretKey": ""
+    }
   }
 }

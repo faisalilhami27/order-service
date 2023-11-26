@@ -10,7 +10,6 @@ type OrderPaymentRequest struct {
 	Amount      float64    `json:"amount"`
 	SubOrderID  uint       `json:"sub_order_id"`
 	PaymentID   uuid.UUID  `json:"payment_id"`
-	InvoiceID   uuid.UUID  `json:"invoice_id,omitempty"`
 	PaymentLink string     `json:"payment_link"`
 	Status      *string    `json:"status"`
 	PaymentType *string    `json:"payment_type"`
@@ -23,7 +22,6 @@ type OrderPaymentRequest struct {
 
 type OrderPaymentResponse struct {
 	PaymentID   uuid.UUID `json:"paymentID"`
-	InvoiceID   uuid.UUID `json:"invoiceID,omitempty"`
 	PaymentLink string    `json:"paymentLink"`
 	Status      *string   `json:"status"`
 }

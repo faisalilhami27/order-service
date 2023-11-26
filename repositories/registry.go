@@ -7,6 +7,7 @@ import (
 
 	orderRepo "order-service/repositories/order"
 	orderHistoryRepo "order-service/repositories/orderhistory"
+	orderInvoiceRepo "order-service/repositories/orderinvoice"
 	orderPaymentRepo "order-service/repositories/orderpayment"
 	subOrderRepo "order-service/repositories/suborder"
 )
@@ -17,6 +18,7 @@ type IRepositoryRegistry interface {
 	GetOrderHistory() orderHistoryRepo.IOrderHistoryRepository
 	GetOrderPayment() orderPaymentRepo.IOrderPaymentRepository
 	GetOrder() orderRepo.IOrderRepository
+	GetOrderInvoice() orderInvoiceRepo.IOrderInvoiceRepository
 }
 
 type Registry struct {
@@ -45,6 +47,10 @@ func (r *Registry) GetOrderPayment() orderPaymentRepo.IOrderPaymentRepository {
 
 func (r *Registry) GetOrder() orderRepo.IOrderRepository {
 	return orderRepo.NewOrder(r.db, r.sentry)
+}
+
+func (r *Registry) GetOrderInvoice() orderInvoiceRepo.IOrderInvoiceRepository {
+	return orderInvoiceRepo.NewOrderInvoice(r.db, r.sentry)
 }
 
 func (r *Registry) GetTx() *gorm.DB {

@@ -57,6 +57,12 @@ type InternalService struct {
 	Payment Payment `json:"payment" yaml:"payment"`
 	RBAC    RBAC    `json:"rbac" yaml:"rbac"`
 	Package Package `json:"package" yaml:"package"`
+	Invoice Invoice `json:"invoice" yaml:"invoice"`
+}
+
+type Invoice struct {
+	Host      string `json:"host" yaml:"host"`
+	SecretKey string `json:"secret_key" yaml:"secretKey"`
 }
 
 type Payment struct {

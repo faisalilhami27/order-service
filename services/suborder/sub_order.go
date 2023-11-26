@@ -2,7 +2,13 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
+
+	invoiceModel "order-service/clients/invoice"
 	packageClient "order-service/clients/package"
+
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -91,7 +97,6 @@ func (o *SubOrder) GetSubOrderList(
 			UpdatedAt:    subOrder.UpdatedAt,
 			Payment: &orderPaymentDTO.OrderPaymentResponse{
 				PaymentID:   subOrder.Payment.PaymentID,
-				InvoiceID:   subOrder.Payment.InvoiceID,
 				PaymentLink: *subOrder.Payment.PaymentURL,
 				Status:      subOrder.Payment.Status,
 			},
@@ -133,7 +138,6 @@ func (o *SubOrder) GetOrderDetail(ctx context.Context, subOrderUUID string) (*su
 		IsPaid:       subOrder.IsPaid,
 		Payment: &orderPaymentDTO.OrderPaymentResponse{
 			PaymentID:   subOrder.Payment.PaymentID,
-			InvoiceID:   subOrder.Payment.InvoiceID,
 			PaymentLink: *subOrder.Payment.PaymentURL,
 			Status:      subOrder.Payment.Status,
 		},
@@ -167,6 +171,12 @@ func (o *SubOrder) CreateOrder(
 	}
 
 	return response, err
+}
+
+func (o *SubOrder) randomNumber() int {
+	random := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
+	number := random.Intn(1000000)
+	return number
 }
 
 //nolint:cyclop,gocognit
@@ -301,7 +311,6 @@ func (o *SubOrder) createDownPaymentOrder(
 				SubOrderID:  subOrder.ID,
 				PaymentID:   paymentResponse.UUID,
 				PaymentLink: paymentResponse.PaymentLink,
-				InvoiceID:   uuid.New(),
 				Status:      paymentResponse.Status,
 				ExpiredAt:   &expiredAt,
 			})
@@ -328,7 +337,6 @@ func (o *SubOrder) createDownPaymentOrder(
 		IsPaid:       subOrder.IsPaid,
 		Payment: &orderPaymentDTO.OrderPaymentResponse{
 			PaymentID:   paymentResponse.UUID,
-			InvoiceID:   uuid.New(),
 			PaymentLink: paymentResponse.PaymentLink,
 			Status:      paymentResponse.Status,
 		},
@@ -439,7 +447,6 @@ func (o *SubOrder) createHalfPaymentOrder(
 				SubOrderID:  subOrder.ID,
 				PaymentID:   paymentResponse.UUID,
 				PaymentLink: paymentResponse.PaymentLink,
-				InvoiceID:   uuid.New(),
 				Status:      paymentResponse.Status,
 				ExpiredAt:   &expiredAt,
 			})
@@ -466,7 +473,6 @@ func (o *SubOrder) createHalfPaymentOrder(
 		IsPaid:       subOrder.IsPaid,
 		Payment: &orderPaymentDTO.OrderPaymentResponse{
 			PaymentID:   paymentResponse.UUID,
-			InvoiceID:   uuid.New(),
 			PaymentLink: paymentResponse.PaymentLink,
 			Status:      paymentResponse.Status,
 		},
@@ -577,7 +583,6 @@ func (o *SubOrder) createFullPaymentOrder(
 				SubOrderID:  subOrder.ID,
 				PaymentID:   paymentResponse.UUID,
 				PaymentLink: paymentResponse.PaymentLink,
-				InvoiceID:   uuid.New(),
 				Status:      paymentResponse.Status,
 				ExpiredAt:   &expiredAt,
 			})
@@ -604,7 +609,6 @@ func (o *SubOrder) createFullPaymentOrder(
 		IsPaid:       subOrder.IsPaid,
 		Payment: &orderPaymentDTO.OrderPaymentResponse{
 			PaymentID:   paymentResponse.UUID,
-			InvoiceID:   uuid.New(),
 			PaymentLink: paymentResponse.PaymentLink,
 			Status:      paymentResponse.Status,
 		},
@@ -643,6 +647,18 @@ func (o *SubOrder) generatePaymentLink(
 	}
 
 	return paymentResponse, nil
+}
+
+func (o *SubOrder) generateInvoice(
+	ctx context.Context,
+	request *invoiceModel.InvoiceRequest,
+) (*invoiceModel.InvoiceData, error) {
+	invoiceResponse, err := o.client.GetInvoice().GenerateInvoice(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+
+	return invoiceResponse, nil
 }
 
 func (o *SubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
@@ -700,7 +716,7 @@ func (o *SubOrder) Cancel(ctx context.Context, subOrderUUID string) error {
 	return nil
 }
 
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func (o *SubOrder) processPayment(
 	ctx context.Context,
 	request *subOrderDTO.PaymentRequest,
@@ -709,10 +725,13 @@ func (o *SubOrder) processPayment(
 	const logCtx = "services.suborder.sub_order.processPayment"
 	var (
 		updateRequest       subOrderDTO.UpdateSubOrderRequest
+		paymentResult       *models.OrderPayment
+		invoiceResponse     *invoiceModel.InvoiceData
 		paidAt, completedAt *time.Time
 		isPaid              = false
 		order               *models.Order
 		total               float64
+		indonesianTitle     string
 		span                = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
@@ -798,6 +817,67 @@ func (o *SubOrder) processPayment(
 			}
 
 			txErr = o.repository.GetOrder().Update(ctx, tx, updateOrder)
+			if txErr != nil {
+				return txErr
+			}
+
+			paymentResult, txErr = o.repository.GetOrderPayment().FindByPaymentID(ctx, tx, request.PaymentID.String())
+			if txErr != nil {
+				return txErr
+			}
+
+			switch subOrder.PaymentType {
+			case constant.PTDownPayment:
+				indonesianTitle = constant.PTDownPaymentIndonesianTitle.String()
+			case constant.PTHalfPayment:
+				indonesianTitle = constant.PTHalfPaymentIndonesianTitle.String()
+			case constant.PTFullPayment:
+				indonesianTitle = constant.PTFullPaymentIndonesianTitle.String()
+			}
+
+			invoiceNumber := fmt.Sprintf("INV/%s/ORD/%d", time.Now().Format("20060102"), o.randomNumber())
+			invoiceRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+				paidDay := paymentResult.PaidAt.Format("02")
+				paidMonth := helper.ConvertToIndonesianMonth(paymentResult.PaidAt.Format("January"))
+				paidYear := paymentResult.PaidAt.Format("2006")
+				invoiceResponse, txErr = o.generateInvoice(
+					ctx,
+					&invoiceModel.InvoiceRequest{
+						InvoiceNumber: invoiceNumber,
+						Customer: invoiceModel.Customer{
+							Name:        order.CustomerName,
+							Email:       order.CustomerEmail,
+							PhoneNumber: order.CustomerPhone,
+						},
+						PaymentDetail: invoiceModel.PaymentDetail{
+							PaymentMethod: strings.ReplaceAll(*paymentResult.PaymentType, "_", " "),
+							BankName:      *paymentResult.Bank,
+							VaNumber:      *paymentResult.VANumber,
+							Date:          fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
+						},
+						Item: invoiceModel.Item{
+							Description: indonesianTitle,
+							Price:       subOrder.Amount,
+						},
+					},
+				)
+				if txErr != nil {
+					return nil, txErr
+				}
+
+				return invoiceResponse, nil
+			})
+			txErr = o.breaker.Execute(ctx, invoiceRequest)
+			if txErr != nil {
+				return txErr
+			}
+
+			txErr = o.repository.GetOrderInvoice().Create(ctx, tx, &models.OrderInvoice{
+				SubOrderID:    subOrder.ID,
+				InvoiceID:     invoiceResponse.UUID,
+				InvoiceNumber: invoiceNumber,
+				InvoiceURL:    invoiceResponse.URL,
+			})
 			if txErr != nil {
 				return txErr
 			}
