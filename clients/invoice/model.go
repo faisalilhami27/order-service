@@ -5,7 +5,13 @@ import (
 )
 
 type InvoiceRequest struct {
-	InvoiceNumber string        `json:"invoice_number"`
+	InvoiceNumber string `json:"invoice_number"`
+	TemplateID    string `json:"template_id"`
+	Data          Data   `json:"data"`
+	CreatedBy     string `json:"created_by"`
+}
+
+type Data struct {
 	Customer      Customer      `json:"customer"`
 	PaymentDetail PaymentDetail `json:"payment_detail"`
 	Item          Item          `json:"item"`
@@ -25,8 +31,8 @@ type PaymentDetail struct {
 }
 
 type Item struct {
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
+	Description string `json:"description"`
+	Price       string `json:"price"`
 }
 
 type ErrorInvoiceResponse struct {

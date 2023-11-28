@@ -16,6 +16,9 @@ const (
 	PTDownPaymentIndonesianTitle PaymentTypeIndonesianTitle = "Pembayaran Uang Muka"
 	PTHalfPaymentIndonesianTitle PaymentTypeIndonesianTitle = "Pembayaran 50%"
 	PTFullPaymentIndonesianTitle PaymentTypeIndonesianTitle = "Pembayaran 100%"
+
+	BankTransferPaymentMethod  = "bank_transfer"
+	VirtualAccountBankTransfer = "virtual_account"
 )
 
 var mapPaymentTypeToTitle = map[PaymentType]PaymentTypeTitle{

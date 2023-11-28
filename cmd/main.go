@@ -67,6 +67,7 @@ var restCmd = &cobra.Command{
 			&models.SubOrder{},
 			&models.OrderHistory{},
 			&models.OrderPayment{},
+			&models.OrderInvoice{},
 		)
 		if err != nil {
 			panic(err)

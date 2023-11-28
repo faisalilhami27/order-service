@@ -61,23 +61,24 @@ type InternalService struct {
 }
 
 type Invoice struct {
-	Host      string `json:"host" yaml:"host"`
-	SecretKey string `json:"secret_key" yaml:"secretKey"`
+	Host       string `json:"host" yaml:"host"`
+	SecretKey  string `json:"secretKey" yaml:"secretKey"`
+	TemplateID string `json:"templateID" yaml:"templateID"`
 }
 
 type Payment struct {
 	Host      string `json:"host" yaml:"host"`
-	SecretKey string `json:"secret_key" yaml:"secretKey"`
+	SecretKey string `json:"secretKey" yaml:"secretKey"`
 }
 
 type RBAC struct {
 	Host      string `json:"host" yaml:"host"`
-	SecretKey string `json:"secret_key" yaml:"secretKey"`
+	SecretKey string `json:"secretKey" yaml:"secretKey"`
 }
 
 type Package struct {
 	Host      string `json:"host" yaml:"host"`
-	SecretKey string `json:"secret_key" yaml:"secretKey"`
+	SecretKey string `json:"secretKey" yaml:"secretKey"`
 }
 
 func Init() {

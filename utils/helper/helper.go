@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strings"
 
+	"github.com/dustin/go-humanize"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -177,4 +179,25 @@ func ConvertToIndonesianMonth(englishMonth string) string {
 	}
 
 	return indonesianMonth
+}
+
+func Ucwords(s string) string {
+	firstLetter := strings.ToUpper(string(s[0]))
+	result := firstLetter + s[1:]
+	for i := 0; i < len(result); i++ {
+		if result[i] == ' ' && i+1 < len(result) {
+			result = result[:i+1] + strings.ToUpper(string(result[i+1])) + result[i+2:]
+		}
+	}
+
+	return result
+}
+
+func RupiahFormat(amount *float64) string {
+	stringValue := "0"
+	if amount != nil {
+		humanizeValue := humanize.CommafWithDigits(*amount, 0)
+		stringValue = strings.ReplaceAll(humanizeValue, ",", ".")
+	}
+	return stringValue
 }

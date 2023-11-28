@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"order-service/constant"
 
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
@@ -49,13 +50,17 @@ func (p *PaymentKafka) HandlePayment(ctx context.Context, message *sarama.Consum
 	data := body.Body.Data
 	orderUUID, _ := uuid.Parse(data.OrderID)     //nolint:errcheck
 	paymentUUID, _ := uuid.Parse(data.PaymentID) //nolint:errcheck
+	var paymentType string
+	if body.Body.Data.PaymentType == constant.BankTransferPaymentMethod {
+		paymentType = constant.VirtualAccountBankTransfer
+	}
 	switch body.Event.Name {
 	case "PENDING":
 		err = p.service.GetSubOrder().ReceivePendingPayment(ctx, &paymentDTO.PaymentRequest{
 			OrderID:     orderUUID,
 			PaymentID:   paymentUUID,
 			PaymentLink: data.PaymentLink,
-			PaymentType: data.PaymentType,
+			PaymentType: paymentType,
 			Amount:      data.Amount,
 			Status:      data.Status,
 			VaNumber:    data.VANumber,
@@ -67,7 +72,7 @@ func (p *PaymentKafka) HandlePayment(ctx context.Context, message *sarama.Consum
 			OrderID:     orderUUID,
 			PaymentID:   paymentUUID,
 			PaymentLink: data.PaymentLink,
-			PaymentType: data.PaymentType,
+			PaymentType: paymentType,
 			Amount:      data.Amount,
 			Status:      data.Status,
 			VaNumber:    data.VANumber,

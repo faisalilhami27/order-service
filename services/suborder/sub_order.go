@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"order-service/config"
 
 	invoiceModel "order-service/clients/invoice"
 	packageClient "order-service/clients/package"
@@ -844,20 +845,24 @@ func (o *SubOrder) processPayment(
 					ctx,
 					&invoiceModel.InvoiceRequest{
 						InvoiceNumber: invoiceNumber,
-						Customer: invoiceModel.Customer{
-							Name:        order.CustomerName,
-							Email:       order.CustomerEmail,
-							PhoneNumber: order.CustomerPhone,
-						},
-						PaymentDetail: invoiceModel.PaymentDetail{
-							PaymentMethod: strings.ReplaceAll(*paymentResult.PaymentType, "_", " "),
-							BankName:      *paymentResult.Bank,
-							VaNumber:      *paymentResult.VANumber,
-							Date:          fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
-						},
-						Item: invoiceModel.Item{
-							Description: indonesianTitle,
-							Price:       subOrder.Amount,
+						TemplateID:    config.Config.InternalService.Invoice.TemplateID,
+						CreatedBy:     order.CustomerID,
+						Data: invoiceModel.Data{
+							Customer: invoiceModel.Customer{
+								Name:        order.CustomerName,
+								Email:       order.CustomerEmail,
+								PhoneNumber: order.CustomerPhone,
+							},
+							PaymentDetail: invoiceModel.PaymentDetail{
+								PaymentMethod: helper.Ucwords(strings.ReplaceAll(*paymentResult.PaymentType, "_", " ")),
+								BankName:      strings.ToUpper(*paymentResult.Bank),
+								VaNumber:      *paymentResult.VANumber,
+								Date:          fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
+							},
+							Item: invoiceModel.Item{
+								Description: indonesianTitle,
+								Price:       helper.RupiahFormat(&subOrder.Amount),
+							},
 						},
 					},
 				)

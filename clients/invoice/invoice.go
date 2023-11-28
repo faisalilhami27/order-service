@@ -63,7 +63,7 @@ func (p *IInvoice) GenerateInvoice(ctx context.Context, request *InvoiceRequest)
 		End()
 
 	var errResponse ErrorInvoiceResponse
-	if resp.StatusCode != http.StatusCreated || len(errs) > 0 {
+	if resp.StatusCode != http.StatusOK || len(errs) > 0 {
 		err = json.Unmarshal([]byte(bodyResp), &errResponse)
 		if err != nil {
 			return nil, err
