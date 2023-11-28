@@ -14,7 +14,8 @@ type InvoiceRequest struct {
 type Data struct {
 	Customer      Customer      `json:"customer"`
 	PaymentDetail PaymentDetail `json:"payment_detail"`
-	Item          Item          `json:"item"`
+	Items         []Item        `json:"items"`
+	Total         string        `json:"total"`
 }
 
 type Customer struct {
@@ -24,10 +25,12 @@ type Customer struct {
 }
 
 type PaymentDetail struct {
-	BankName      string `json:"bank_name"`
-	PaymentMethod string `json:"payment_method"`
-	VaNumber      string `json:"va_number"`
-	Date          string `json:"date"`
+	BankName                   string `json:"bank_name"`
+	PaymentMethod              string `json:"payment_method"`
+	VaNumber                   string `json:"va_number"`
+	Date                       string `json:"date"`
+	RemainingOutstandingAmount string `json:"remaining_outstanding_amount"`
+	IsPaid                     bool   `json:"is_paid"`
 }
 
 type Item struct {

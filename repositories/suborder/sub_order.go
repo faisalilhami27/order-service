@@ -35,6 +35,7 @@ type ISubOrderRepository interface {
 	Cancel(context.Context, *gorm.DB, *subOrderDTO.CancelRequest, *subOrderModel.SubOrder) error
 	BulkCreate(context.Context, *gorm.DB, []subOrderModel.SubOrder) ([]subOrderModel.SubOrder, error)
 	Update(context.Context, *gorm.DB, *subOrderDTO.UpdateSubOrderRequest, *subOrderModel.SubOrder) error
+	FindAllByOrderID(context.Context, uint) ([]subOrderModel.SubOrder, error)
 }
 
 func NewSubOrder(db *gorm.DB, sentry sentry.ISentry) ISubOrderRepository {
@@ -103,6 +104,27 @@ func (o *ISubOrder) FindOneByUUID(ctx context.Context, orderUUID string) (*subOr
 		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
 	}
 	return &order, nil
+}
+
+func (o *ISubOrder) FindAllByOrderID(ctx context.Context, orderID uint) ([]subOrderModel.SubOrder, error) {
+	const logCtx = "repositories.suborder.sub_order.FindAllByOrderID"
+	var (
+		span  = o.sentry.StartSpan(ctx, logCtx)
+		order []subOrderModel.SubOrder
+	)
+	ctx = o.sentry.SpanContext(span)
+	defer o.sentry.Finish(span)
+
+	err := o.db.WithContext(ctx).
+		Where("order_id = ?", orderID).
+		Find(&order).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errOrder.ErrOrderNotFound
+		}
+		return nil, errorHelper.WrapError(errorGeneral.ErrSQLError, o.sentry)
+	}
+	return order, nil
 }
 
 func (o *ISubOrder) FindOneByOrderIDAndPaymentType(

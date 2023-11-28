@@ -728,6 +728,7 @@ func (o *SubOrder) processPayment(
 		updateRequest       subOrderDTO.UpdateSubOrderRequest
 		paymentResult       *models.OrderPayment
 		invoiceResponse     *invoiceModel.InvoiceData
+		allSubOrder         []models.SubOrder
 		paidAt, completedAt *time.Time
 		isPaid              = false
 		order               *models.Order
@@ -827,20 +828,40 @@ func (o *SubOrder) processPayment(
 				return txErr
 			}
 
-			switch subOrder.PaymentType {
-			case constant.PTDownPayment:
-				indonesianTitle = constant.PTDownPaymentIndonesianTitle.String()
-			case constant.PTHalfPayment:
-				indonesianTitle = constant.PTHalfPaymentIndonesianTitle.String()
-			case constant.PTFullPayment:
-				indonesianTitle = constant.PTFullPaymentIndonesianTitle.String()
+			allSubOrder, txErr = o.repository.GetSubOrder().FindAllByOrderID(ctx, order.ID)
+			if txErr != nil {
+				return txErr
+			}
+			items := make([]invoiceModel.Item, 0, len(allSubOrder))
+			var totalPrice float64
+			for _, item := range allSubOrder {
+				switch item.PaymentType {
+				case constant.PTDownPayment:
+					indonesianTitle = constant.PTDownPaymentIndonesianTitle.String()
+				case constant.PTHalfPayment:
+					indonesianTitle = constant.PTHalfPaymentIndonesianTitle.String()
+				case constant.PTFullPayment:
+					indonesianTitle = constant.PTFullPaymentIndonesianTitle.String()
+				}
+
+				totalPrice += item.Amount
+				items = append(items, invoiceModel.Item{
+					Description: indonesianTitle,
+					Price:       helper.RupiahFormat(&item.Amount),
+				})
 			}
 
+			if total == 0 {
+				isPaid = true
+			} else {
+				isPaid = false
+			}
 			invoiceNumber := fmt.Sprintf("INV/%s/ORD/%d", time.Now().Format("20060102"), o.randomNumber())
 			invoiceRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
 				paidDay := paymentResult.PaidAt.Format("02")
 				paidMonth := helper.ConvertToIndonesianMonth(paymentResult.PaidAt.Format("January"))
 				paidYear := paymentResult.PaidAt.Format("2006")
+				paymentMethod := helper.Ucwords(strings.ReplaceAll(*paymentResult.PaymentType, "_", " "))
 				invoiceResponse, txErr = o.generateInvoice(
 					ctx,
 					&invoiceModel.InvoiceRequest{
@@ -854,15 +875,15 @@ func (o *SubOrder) processPayment(
 								PhoneNumber: order.CustomerPhone,
 							},
 							PaymentDetail: invoiceModel.PaymentDetail{
-								PaymentMethod: helper.Ucwords(strings.ReplaceAll(*paymentResult.PaymentType, "_", " ")),
-								BankName:      strings.ToUpper(*paymentResult.Bank),
-								VaNumber:      *paymentResult.VANumber,
-								Date:          fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
+								PaymentMethod:              paymentMethod,
+								BankName:                   strings.ToUpper(*paymentResult.Bank),
+								VaNumber:                   *paymentResult.VANumber,
+								RemainingOutstandingAmount: helper.RupiahFormat(&total),
+								Date:                       fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
+								IsPaid:                     isPaid,
 							},
-							Item: invoiceModel.Item{
-								Description: indonesianTitle,
-								Price:       helper.RupiahFormat(&subOrder.Amount),
-							},
+							Items: items,
+							Total: helper.RupiahFormat(&totalPrice),
 						},
 					},
 				)
