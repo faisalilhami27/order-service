@@ -57,7 +57,8 @@
     },
     "invoice": {
       "host": "http://localhost:8006",
-      "secretKey": ""
+      "secretKey": "",
+      "templateID": ""
     }
   }
 }
