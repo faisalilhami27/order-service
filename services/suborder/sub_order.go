@@ -195,8 +195,7 @@ func (o *SubOrder) createDownPaymentOrder(
 		packageResponse  *packageClient.PackageData
 		err              error
 		orderHistories   []orderHistoryDTO.OrderHistoryRequest
-		amount           float64 = 100000000 // will be remove if package service is ready
-		span                     = o.sentry.StartSpan(ctx, logCtx)
+		span             = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
 	defer o.sentry.Finish(span)
@@ -258,7 +257,7 @@ func (o *SubOrder) createDownPaymentOrder(
 			CustomerEmail:              customerResponse.Email,
 			CustomerPhone:              customerResponse.PhoneNumber,
 			PackageID:                  request.PackageID.String(),
-			RemainingOutstandingAmount: amount,
+			RemainingOutstandingAmount: float64(packageResponse.Price),
 		})
 		if txErr != nil {
 			return txErr
