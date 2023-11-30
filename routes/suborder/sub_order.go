@@ -3,6 +3,8 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 
+	"order-service/middlewares"
+
 	controllerRegistry "order-service/controllers/http"
 )
 
@@ -27,8 +29,16 @@ func NewSubOrderRoute(
 
 func (o *SubOrderRoute) Run() {
 	group := o.route.Group("/order")
-	group.GET("", o.controller.GetSubOrder().GetSubOrderList)
-	group.GET("/:uuid", o.controller.GetSubOrder().GetSubOrderDetail)
-	group.POST("/:uuid", o.controller.GetSubOrder().CancelOrder)
-	group.POST("", o.controller.GetSubOrder().CreateOrder)
+	group.GET("", middlewares.CheckPermission([]string{
+		"oms:management-order:order:view",
+	}), o.controller.GetSubOrder().GetSubOrderList)
+	group.GET("/:uuid", middlewares.CheckPermission([]string{
+		"oms:management-order:order:view",
+	}), o.controller.GetSubOrder().GetSubOrderDetail)
+	group.POST("/:uuid", middlewares.CheckPermission([]string{
+		"oms:management-order:order:update",
+	}), o.controller.GetSubOrder().CancelOrder)
+	group.POST("", middlewares.CheckPermission([]string{
+		"oms:management-order:order:create",
+	}), o.controller.GetSubOrder().CreateOrder)
 }

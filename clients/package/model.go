@@ -32,14 +32,15 @@ type PackagePromo struct {
 }
 
 type PackageData struct {
-	ID           int          `json:"id"`
-	UUID         uuid.UUID    `json:"uuid"`
-	Name         string       `json:"name"`
-	Description  string       `json:"description"`
-	Price        int          `json:"price"`
-	Pack         int          `json:"pack"`
-	IsActive     bool         `json:"isActive"`
-	CreatedAt    time.Time    `json:"createdAt"`
-	UpdatedAt    time.Time    `json:"updatedAt"`
-	PackagePromo PackagePromo `json:"packagePromo"`
+	ID                 int          `json:"id"`
+	UUID               uuid.UUID    `json:"uuid"`
+	Name               string       `json:"name"`
+	Description        string       `json:"description"`
+	Price              int          `json:"price"`
+	Pack               int          `json:"pack"`
+	MinimumDownPayment int          `json:"minimumDownPayment"`
+	IsActive           bool         `json:"isActive"`
+	CreatedAt          time.Time    `json:"createdAt"`
+	UpdatedAt          time.Time    `json:"updatedAt"`
+	PackagePromo       PackagePromo `json:"packagePromo"`
 }

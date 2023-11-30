@@ -220,9 +220,10 @@ func (o *SubOrder) createDownPaymentOrder(
 			return txErr
 		}
 
-		total := float64(packageResponse.Price) * 10 / 100
+		total := float64(packageResponse.Price) * float64(packageResponse.MinimumDownPayment) / 100
 		if total != request.Amount {
-			return errOrder.ErrInvalidDownAmount
+			newError := fmt.Errorf("down payment must be %d%% from package price", packageResponse.MinimumDownPayment) //nolint:goerr113,lll
+			return newError
 		}
 
 		customerID, _ := uuid.Parse(request.CustomerID.String()) //nolint:errcheck

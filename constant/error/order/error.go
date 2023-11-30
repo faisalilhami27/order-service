@@ -7,7 +7,6 @@ var (
 	ErrPreviousOrderNotEmpty = errors.New(`error: previous order not completed yet`)
 	ErrOrderIsEmpty          = errors.New(`error: order id cannot be empty`)
 	ErrCancelOrder           = errors.New(`error: this order already cancelled`)
-	ErrInvalidDownAmount     = errors.New(`error: amount must be 10% from total price`)
 	ErrInvalidHalfAmount     = errors.New(
 		`error: amount must be 50% from (remaining outstanding amount - down payment)`)
 	ErrInvalidFullAmount = errors.New(

@@ -11,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
+	clientConfig "order-service/clients/config"
+
 	"order-service/config"
 	"order-service/constant"
 	constantError "order-service/constant/error"
@@ -44,14 +46,86 @@ func ValidateAPIKey() gin.HandlerFunc {
 		apiKeyHash := hex.EncodeToString(hash.Sum(nil))
 
 		if apiKey != apiKeyHash {
-			newError := fmt.Sprintf("Unauthorized") //nolint:gosimple
 			c.JSON(http.StatusUnauthorized, response.Response{
 				Status:  constantError.Error,
-				Message: newError,
+				Message: constantError.ErrUnauthorized,
 			})
 			c.Abort()
 			return
 		}
+		c.Next()
+	}
+}
+
+func AuthenticateRBAC() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.GetHeader(constant.Authorization)
+		if token == "" {
+			c.JSON(http.StatusUnauthorized, response.Response{
+				Status:  constantError.Error,
+				Message: constantError.ErrUnauthorized.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		client := clientConfig.NewClientConfig(
+			clientConfig.WithBaseURL(config.Config.InternalService.RBAC.Host),
+			clientConfig.WithSecretKey(config.Config.InternalService.RBAC.SecretKey))
+
+		rbac := NewRBACMiddleware(client)
+		user, err := rbac.GetUserLogin(token)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, response.Response{
+				Status:  constantError.Error,
+				Message: err.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		c.Set(constant.Token, token)
+		c.Set(constant.UserLogin, user)
+		c.Next()
+	}
+}
+
+func CheckPermission(permissions []string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token, ok := c.Get(constant.Token)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, response.Response{
+				Status:  constantError.Error,
+				Message: constantError.ErrUnauthorized.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		client := clientConfig.NewClientConfig(
+			clientConfig.WithBaseURL(config.Config.InternalService.RBAC.Host),
+			clientConfig.WithSecretKey(config.Config.InternalService.RBAC.SecretKey))
+
+		rbac := NewRBACMiddleware(client)
+		user, err := rbac.CheckPermission(token.(string), permissions)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, response.Response{
+				Status:  constantError.Error,
+				Message: err.Error(),
+			})
+			c.Abort()
+			return
+		}
+
+		if !user.Allowed {
+			c.JSON(http.StatusForbidden, response.Response{
+				Status:  constantError.Error,
+				Message: constantError.ErrForbidden.Error(),
+			})
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }
