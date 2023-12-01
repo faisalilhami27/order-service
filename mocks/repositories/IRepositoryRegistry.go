@@ -8,6 +8,8 @@ import (
 
 	orderhistory "order-service/repositories/orderhistory"
 
+	orderinvoice "order-service/repositories/orderinvoice"
+
 	orderpayment "order-service/repositories/orderpayment"
 
 	repositories "order-service/repositories/order"
@@ -46,6 +48,22 @@ func (_m *IRepositoryRegistry) GetOrderHistory() orderhistory.IOrderHistoryRepos
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(orderhistory.IOrderHistoryRepository)
+		}
+	}
+
+	return r0
+}
+
+// GetOrderInvoice provides a mock function with given fields:
+func (_m *IRepositoryRegistry) GetOrderInvoice() orderinvoice.IOrderInvoiceRepository {
+	ret := _m.Called()
+
+	var r0 orderinvoice.IOrderInvoiceRepository
+	if rf, ok := ret.Get(0).(func() orderinvoice.IOrderInvoiceRepository); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(orderinvoice.IOrderInvoiceRepository)
 		}
 	}
 

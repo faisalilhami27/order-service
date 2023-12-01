@@ -86,6 +86,32 @@ func (_m *ISubOrderRepository) Create(_a0 context.Context, _a1 *gorm.DB, _a2 *mo
 	return r0, r1
 }
 
+// FindAllByOrderID provides a mock function with given fields: _a0, _a1
+func (_m *ISubOrderRepository) FindAllByOrderID(_a0 context.Context, _a1 uint) ([]models.SubOrder, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 []models.SubOrder
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint) ([]models.SubOrder, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint) []models.SubOrder); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]models.SubOrder)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // FindAllWithPagination provides a mock function with given fields: _a0, _a1
 func (_m *ISubOrderRepository) FindAllWithPagination(_a0 context.Context, _a1 *dto.SubOrderRequestParam) ([]models.SubOrder, int64, error) {
 	ret := _m.Called(_a0, _a1)

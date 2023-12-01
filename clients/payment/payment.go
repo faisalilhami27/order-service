@@ -62,8 +62,12 @@ func (p *IPayment) CreatePaymentLink(ctx context.Context, request *PaymentReques
 		Send(string(body)).
 		End()
 
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+
 	var errResponse ErrorPaymentResponse
-	if resp.StatusCode != http.StatusCreated || len(errs) > 0 {
+	if resp.StatusCode != http.StatusCreated {
 		err = json.Unmarshal([]byte(bodyResp), &errResponse)
 		if err != nil {
 			return nil, err

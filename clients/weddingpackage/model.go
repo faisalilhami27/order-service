@@ -38,7 +38,7 @@ type PackageData struct {
 	Description        string       `json:"description"`
 	Price              int          `json:"price"`
 	Pack               int          `json:"pack"`
-	MinimumDownPayment int          `json:"minimumDownPayment"`
+	MinimalDownPayment int          `json:"minimalDownPayment"`
 	IsActive           bool         `json:"isActive"`
 	CreatedAt          time.Time    `json:"createdAt"`
 	UpdatedAt          time.Time    `json:"updatedAt"`

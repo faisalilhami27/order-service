@@ -13,24 +13,24 @@ import (
 	"order-service/utils/helper"
 )
 
-type IRbac struct {
+type IWeddingPackage struct {
 	client clientConfig.IClientConfig
 	sentry sentry.ISentry
 }
 
-type IRbacClient interface {
-	GetUserRBAC(context.Context, string) (*RBACData, error)
+type IWeddingPackageClient interface {
+	GetDetailPackage(context.Context, string) (*PackageData, error)
 }
 
-func NewRBACClient(sentry sentry.ISentry, client clientConfig.IClientConfig) IRbacClient {
-	return &IRbac{
+func NewWeddingPackageClient(sentry sentry.ISentry, client clientConfig.IClientConfig) IWeddingPackageClient {
+	return &IWeddingPackage{
 		client: client,
 		sentry: sentry,
 	}
 }
 
-func (i *IRbac) GetUserRBAC(ctx context.Context, uuid string) (*RBACData, error) {
-	logCtx := "common.clients.rbac.rbac.GetUserRBAC"
+func (i *IWeddingPackage) GetDetailPackage(ctx context.Context, uuid string) (*PackageData, error) {
+	logCtx := "common.clients.weddingpackage.weddingpackage.GetDetailPackage"
 	var (
 		span = i.sentry.StartSpan(ctx, logCtx)
 	)
@@ -49,7 +49,7 @@ func (i *IRbac) GetUserRBAC(ctx context.Context, uuid string) (*RBACData, error)
 		Set(constant.XServiceName, config.Config.AppName).
 		Set(constant.XApiKey, apiKey).
 		Set(constant.XRequestAt, fmt.Sprintf("%d", unixTime)).
-		Get(fmt.Sprintf("%s/api/v1/user/%s", i.client.BaseURL(), uuid))
+		Get(fmt.Sprintf("%s/api/v1/weddingpackage/%s", i.client.BaseURL(), uuid))
 
 	resp, _, errs := clone.EndStruct(&response)
 	if len(errs) > 0 {
@@ -57,7 +57,7 @@ func (i *IRbac) GetUserRBAC(ctx context.Context, uuid string) (*RBACData, error)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		rbacError := fmt.Errorf("rbac response: %s", response.Message) //nolint:goerr113
+		rbacError := fmt.Errorf("weddingpackage response: %s", response.Message) //nolint:goerr113
 		return nil, rbacError
 	}
 

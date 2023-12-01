@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -84,8 +85,9 @@ func AuthenticateRBAC() gin.HandlerFunc {
 			return
 		}
 
+		userLogin := c.Request.WithContext(context.WithValue(c.Request.Context(), constant.UserLogin, user)) //nolint:staticcheck,lll
+		c.Request = userLogin
 		c.Set(constant.Token, token)
-		c.Set(constant.UserLogin, user)
 		c.Next()
 	}
 }

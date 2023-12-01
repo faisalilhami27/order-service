@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"order-service/config"
+	"order-service/utils/helper/rbac"
+	"sync"
 
 	invoiceModel "order-service/clients/invoice"
-	packageClient "order-service/clients/package"
+	packageClient "order-service/clients/weddingpackage"
+	"order-service/config"
 
 	"strings"
 	"time"
@@ -18,7 +20,6 @@ import (
 
 	"order-service/clients"
 	paymentClient "order-service/clients/payment"
-	rbacClient "order-service/clients/rbac"
 	"order-service/common/circuitbreaker"
 	"order-service/common/sentry"
 	errorGeneral "order-service/constant/error"
@@ -39,6 +40,15 @@ type SubOrder struct {
 	client     clients.IClientRegistry
 	sentry     sentry.ISentry
 	breaker    circuitbreaker.ICircuitBreaker
+}
+
+type ClientResponse struct {
+	packageData  *packageClient.PackageData
+	paymentData  *paymentClient.PaymentData
+	invoiceData  *invoiceModel.InvoiceData
+	packageError error
+	invoiceError error
+	paymentError error
 }
 
 type ISubOrderService interface {
@@ -176,7 +186,7 @@ func (o *SubOrder) CreateOrder(
 
 func (o *SubOrder) randomNumber() int {
 	random := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
-	number := random.Intn(1000000)
+	number := random.Intn(900000) + 100000
 	return number
 }
 
@@ -187,15 +197,17 @@ func (o *SubOrder) createDownPaymentOrder(
 ) (*subOrderDTO.SubOrderResponse, error) {
 	const logCtx = "services.suborder.sub_order.createDownPaymentOrder"
 	var (
-		subOrder         *models.SubOrder
-		order            *models.Order
-		txErr            error
-		paymentResponse  *paymentClient.PaymentData
-		customerResponse *rbacClient.RBACData
-		packageResponse  *packageClient.PackageData
-		err              error
-		orderHistories   []orderHistoryDTO.OrderHistoryRequest
-		span             = o.sentry.StartSpan(ctx, logCtx)
+		subOrder        *models.SubOrder
+		order           *models.Order
+		txErr           error
+		paymentResponse *paymentClient.PaymentData
+		packageResponse *packageClient.PackageData
+		err             error
+		user            = rbac.GetUserLogin(ctx)
+		orderHistories  []orderHistoryDTO.OrderHistoryRequest
+		wg              sync.WaitGroup
+		resultChan      = make(chan ClientResponse, 2)
+		span            = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
 	defer o.sentry.Finish(span)
@@ -208,8 +220,19 @@ func (o *SubOrder) createDownPaymentOrder(
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		packageRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
-			packageResponse, txErr = o.client.GetPackage().GetDetailPackage(ctx, request.PackageID.String())
-			if txErr != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				packageResponse, err = o.client.GetWeddingPackage().GetDetailPackage(ctx, request.PackageID.String())
+				resultChan <- ClientResponse{
+					packageData:  packageResponse,
+					packageError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.packageError != nil {
+				txErr = result.packageError
 				return nil, txErr
 			}
 
@@ -220,9 +243,9 @@ func (o *SubOrder) createDownPaymentOrder(
 			return txErr
 		}
 
-		total := float64(packageResponse.Price) * float64(packageResponse.MinimumDownPayment) / 100
+		total := float64(packageResponse.Price) * float64(packageResponse.MinimalDownPayment) / 100
 		if total != request.Amount {
-			newError := fmt.Errorf("down payment must be %d%% from package price", packageResponse.MinimumDownPayment) //nolint:goerr113,lll
+			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", packageResponse.MinimalDownPayment) //nolint:goerr113,lll
 			return newError
 		}
 
@@ -238,25 +261,11 @@ func (o *SubOrder) createDownPaymentOrder(
 			}
 		}
 
-		rbacRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
-			customerResponse, txErr = o.client.GetRBAC().GetUserRBAC(ctx, request.CustomerID.String())
-			if txErr != nil {
-				return nil, txErr
-			}
-
-			return customerResponse, nil
-		})
-
-		txErr = o.breaker.Execute(ctx, rbacRequest)
-		if txErr != nil {
-			return txErr
-		}
-
 		order, txErr = o.repository.GetOrder().Create(ctx, tx, &orderDTO.OrderRequest{
 			CustomerID:                 request.CustomerID.String(),
-			CustomerName:               customerResponse.Name,
-			CustomerEmail:              customerResponse.Email,
-			CustomerPhone:              customerResponse.PhoneNumber,
+			CustomerName:               user.Name,
+			CustomerEmail:              user.Email,
+			CustomerPhone:              user.PhoneNumber,
 			PackageID:                  request.PackageID.String(),
 			RemainingOutstandingAmount: float64(packageResponse.Price),
 		})
@@ -288,14 +297,25 @@ func (o *SubOrder) createDownPaymentOrder(
 
 		expiredAt := time.Now().Add(24 * time.Hour)
 		paymentRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
-			paymentResponse, txErr = o.generatePaymentLink(
-				ctx,
-				subOrder,
-				order,
-				request,
-				expiredAt,
-			)
-			if txErr != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				paymentResponse, err = o.generatePaymentLink(
+					ctx,
+					subOrder,
+					order,
+					request,
+					expiredAt,
+				)
+				resultChan <- ClientResponse{
+					paymentData:  paymentResponse,
+					paymentError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.paymentError != nil {
+				txErr = result.paymentError
 				return nil, txErr
 			}
 
@@ -305,6 +325,11 @@ func (o *SubOrder) createDownPaymentOrder(
 		if txErr != nil {
 			return txErr
 		}
+
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
 
 		txErr = o.repository.GetOrderPayment().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
@@ -358,6 +383,8 @@ func (o *SubOrder) createHalfPaymentOrder(
 		paymentResponse *paymentClient.PaymentData
 		err             error
 		orderHistories  []orderHistoryDTO.OrderHistoryRequest
+		wg              sync.WaitGroup
+		resultChan      = make(chan ClientResponse, 2)
 		span            = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
@@ -424,14 +451,25 @@ func (o *SubOrder) createHalfPaymentOrder(
 
 		expiredAt := time.Now().Add(24 * time.Hour)
 		paymentRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
-			paymentResponse, txErr = o.generatePaymentLink(
-				ctx,
-				subOrder,
-				order,
-				request,
-				expiredAt,
-			)
-			if txErr != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				paymentResponse, err = o.generatePaymentLink(
+					ctx,
+					subOrder,
+					order,
+					request,
+					expiredAt,
+				)
+				resultChan <- ClientResponse{
+					paymentData:  paymentResponse,
+					paymentError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.paymentError != nil {
+				txErr = result.paymentError
 				return nil, txErr
 			}
 
@@ -441,6 +479,11 @@ func (o *SubOrder) createHalfPaymentOrder(
 		if txErr != nil {
 			return txErr
 		}
+
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
 
 		txErr = o.repository.GetOrderPayment().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
@@ -494,6 +537,8 @@ func (o *SubOrder) createFullPaymentOrder(
 		paymentResponse *paymentClient.PaymentData
 		err             error
 		orderHistories  []orderHistoryDTO.OrderHistoryRequest
+		wg              sync.WaitGroup
+		resultChan      = make(chan ClientResponse, 2)
 		span            = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
@@ -560,14 +605,25 @@ func (o *SubOrder) createFullPaymentOrder(
 
 		expiredAt := time.Now().Add(24 * time.Hour)
 		paymentRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
-			paymentResponse, txErr = o.generatePaymentLink(
-				ctx,
-				subOrder,
-				order,
-				request,
-				expiredAt,
-			)
-			if txErr != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				paymentResponse, err = o.generatePaymentLink(
+					ctx,
+					subOrder,
+					order,
+					request,
+					expiredAt,
+				)
+				resultChan <- ClientResponse{
+					paymentData:  paymentResponse,
+					paymentError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.paymentError != nil {
+				txErr = result.paymentError
 				return nil, txErr
 			}
 
@@ -577,6 +633,11 @@ func (o *SubOrder) createFullPaymentOrder(
 		if txErr != nil {
 			return txErr
 		}
+
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
 
 		txErr = o.repository.GetOrderPayment().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
@@ -734,6 +795,8 @@ func (o *SubOrder) processPayment(
 		order               *models.Order
 		total               float64
 		indonesianTitle     string
+		wg                  sync.WaitGroup
+		resultChan          = make(chan ClientResponse, 1)
 		span                = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
@@ -862,32 +925,43 @@ func (o *SubOrder) processPayment(
 				paidMonth := helper.ConvertToIndonesianMonth(paymentResult.PaidAt.Format("January"))
 				paidYear := paymentResult.PaidAt.Format("2006")
 				paymentMethod := helper.Ucwords(strings.ReplaceAll(*paymentResult.PaymentType, "_", " "))
-				invoiceResponse, txErr = o.generateInvoice(
-					ctx,
-					&invoiceModel.InvoiceRequest{
-						InvoiceNumber: invoiceNumber,
-						TemplateID:    config.Config.InternalService.Invoice.TemplateID,
-						CreatedBy:     order.CustomerID,
-						Data: invoiceModel.Data{
-							Customer: invoiceModel.Customer{
-								Name:        order.CustomerName,
-								Email:       order.CustomerEmail,
-								PhoneNumber: order.CustomerPhone,
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					invoiceResponse, err = o.generateInvoice(
+						ctx,
+						&invoiceModel.InvoiceRequest{
+							InvoiceNumber: invoiceNumber,
+							TemplateID:    config.Config.InternalService.Invoice.TemplateID,
+							CreatedBy:     order.CustomerID,
+							Data: invoiceModel.Data{
+								Customer: invoiceModel.Customer{
+									Name:        order.CustomerName,
+									Email:       order.CustomerEmail,
+									PhoneNumber: order.CustomerPhone,
+								},
+								PaymentDetail: invoiceModel.PaymentDetail{
+									PaymentMethod:              paymentMethod,
+									BankName:                   strings.ToUpper(*paymentResult.Bank),
+									VaNumber:                   *paymentResult.VANumber,
+									RemainingOutstandingAmount: helper.RupiahFormat(&total),
+									Date:                       fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
+									IsPaid:                     isPaid,
+								},
+								Items: items,
+								Total: helper.RupiahFormat(&totalPrice),
 							},
-							PaymentDetail: invoiceModel.PaymentDetail{
-								PaymentMethod:              paymentMethod,
-								BankName:                   strings.ToUpper(*paymentResult.Bank),
-								VaNumber:                   *paymentResult.VANumber,
-								RemainingOutstandingAmount: helper.RupiahFormat(&total),
-								Date:                       fmt.Sprintf("%s %s %s", paidDay, paidMonth, paidYear),
-								IsPaid:                     isPaid,
-							},
-							Items: items,
-							Total: helper.RupiahFormat(&totalPrice),
 						},
-					},
-				)
-				if txErr != nil {
+					)
+					resultChan <- ClientResponse{
+						invoiceData:  invoiceResponse,
+						invoiceError: err,
+					}
+				}()
+
+				result := <-resultChan
+				if result.paymentError != nil {
+					txErr = result.paymentError
 					return nil, txErr
 				}
 
@@ -897,6 +971,11 @@ func (o *SubOrder) processPayment(
 			if txErr != nil {
 				return txErr
 			}
+
+			go func() {
+				wg.Wait()
+				close(resultChan)
+			}()
 
 			txErr = o.repository.GetOrderInvoice().Create(ctx, tx, &models.OrderInvoice{
 				SubOrderID:    subOrder.ID,
