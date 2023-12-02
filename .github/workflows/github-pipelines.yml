@@ -11,17 +11,22 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.21.3'
           cache: false
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3.7.0
         with:
           version: v1.54
+          skip-cache: true
+          install-mode: "goinstall"
+          skip-pkg-cache: true
+          skip-build-cache: true
 
       - name: Linter
         run: make linter

@@ -1088,17 +1088,15 @@ func (o *SubOrder) processPayment(
 					return nil, txErr
 				}
 
+				wg.Wait()
+				close(resultChan)
+
 				return invoiceResponse, nil
 			})
 			txErr = o.breaker.Execute(ctx, invoiceRequest)
 			if txErr != nil {
 				return txErr
 			}
-
-			go func() {
-				wg.Wait()
-				close(resultChan)
-			}()
 
 			txErr = o.repository.GetOrderInvoice().Create(ctx, tx, &models.OrderInvoice{
 				SubOrderID:    subOrder.ID,
