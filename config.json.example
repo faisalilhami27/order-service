@@ -58,7 +58,14 @@
     "invoice": {
       "host": "http://localhost:8006",
       "secretKey": "",
+      "staticKey": "",
       "templateID": ""
-    }
+    },
+    "notification": {
+      "host": "http://localhost:8007",
+      "secretKey": "",
+      "staticKey": "",
+      "templateID": ""
+    },
   }
 }
