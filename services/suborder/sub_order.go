@@ -1018,25 +1018,6 @@ func (o *SubOrder) processPayment(
 				return txErr
 			}
 			items := make([]invoiceModel.Item, 0, len(allSubOrder))
-			var totalPrice float64
-			for _, item := range allSubOrder {
-				var indonesianTitle string
-				switch item.PaymentType {
-				case constant.PTDownPayment:
-					indonesianTitle = constant.PTDownPaymentIndonesianTitle.String()
-				case constant.PTHalfPayment:
-					indonesianTitle = constant.PTHalfPaymentIndonesianTitle.String()
-				case constant.PTFullPayment:
-					indonesianTitle = constant.PTFullPaymentIndonesianTitle.String()
-				}
-
-				totalPrice += item.Amount
-				items = append(items, invoiceModel.Item{
-					Description: indonesianTitle,
-					Price:       helper.RupiahFormat(&item.Amount),
-				})
-			}
-
 			if total == 0 {
 				isPaid = true
 			} else {
@@ -1072,7 +1053,7 @@ func (o *SubOrder) processPayment(
 									IsPaid:                     isPaid,
 								},
 								Items: items,
-								Total: helper.RupiahFormat(&totalPrice),
+								Total: helper.RupiahFormat(&total),
 							},
 						},
 					)
