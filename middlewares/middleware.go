@@ -49,7 +49,7 @@ func ValidateAPIKey() gin.HandlerFunc {
 		if apiKey != apiKeyHash {
 			c.JSON(http.StatusUnauthorized, response.Response{
 				Status:  constantError.Error,
-				Message: constantError.ErrUnauthorized,
+				Message: constantError.ErrUnauthorized.Error(),
 			})
 			c.Abort()
 			return

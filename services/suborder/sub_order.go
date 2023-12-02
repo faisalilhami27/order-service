@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"order-service/utils/helper/rbac"
 	"sync"
 
 	invoiceModel "order-service/clients/invoice"
+	notificationClient "order-service/clients/notification"
 	packageClient "order-service/clients/weddingpackage"
 	"order-service/config"
+	"order-service/utils/helper/rbac"
 
 	"strings"
 	"time"
@@ -43,12 +44,13 @@ type SubOrder struct {
 }
 
 type ClientResponse struct {
-	packageData  *packageClient.PackageData
-	paymentData  *paymentClient.PaymentData
-	invoiceData  *invoiceModel.InvoiceData
-	packageError error
-	invoiceError error
-	paymentError error
+	packageData       *packageClient.PackageData
+	paymentData       *paymentClient.PaymentData
+	invoiceData       *invoiceModel.InvoiceData
+	packageError      error
+	invoiceError      error
+	paymentError      error
+	notificationError error
 }
 
 type ISubOrderService interface {
@@ -206,7 +208,7 @@ func (o *SubOrder) createDownPaymentOrder(
 		user            = rbac.GetUserLogin(ctx)
 		orderHistories  []orderHistoryDTO.OrderHistoryRequest
 		wg              sync.WaitGroup
-		resultChan      = make(chan ClientResponse, 2)
+		resultChan      = make(chan ClientResponse, 3)
 		span            = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
@@ -326,11 +328,6 @@ func (o *SubOrder) createDownPaymentOrder(
 			return txErr
 		}
 
-		go func() {
-			wg.Wait()
-			close(resultChan)
-		}()
-
 		txErr = o.repository.GetOrderPayment().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
 				Amount:      request.Amount,
@@ -343,6 +340,41 @@ func (o *SubOrder) createDownPaymentOrder(
 		if txErr != nil {
 			return txErr
 		}
+
+		notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = o.sendToWhatsapp(
+					ctx,
+					expiredAt,
+					order.CustomerPhone,
+					subOrder.UUID.String(),
+					request.Amount,
+					paymentResponse.PaymentLink,
+				)
+				resultChan <- ClientResponse{
+					notificationError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.notificationError != nil {
+				txErr = result.notificationError
+				return nil, txErr
+			}
+
+			return nil, nil
+		})
+		txErr = o.breaker.Execute(ctx, notificationRequest)
+		if txErr != nil {
+			return txErr
+		}
+
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
 
 		return nil
 	})
@@ -480,11 +512,6 @@ func (o *SubOrder) createHalfPaymentOrder(
 			return txErr
 		}
 
-		go func() {
-			wg.Wait()
-			close(resultChan)
-		}()
-
 		txErr = o.repository.GetOrderPayment().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
 				Amount:      request.Amount,
@@ -497,6 +524,41 @@ func (o *SubOrder) createHalfPaymentOrder(
 		if txErr != nil {
 			return txErr
 		}
+
+		notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = o.sendToWhatsapp(
+					ctx,
+					expiredAt,
+					order.CustomerPhone,
+					subOrder.UUID.String(),
+					request.Amount,
+					paymentResponse.PaymentLink,
+				)
+				resultChan <- ClientResponse{
+					notificationError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.notificationError != nil {
+				txErr = result.notificationError
+				return nil, txErr
+			}
+
+			return nil, nil
+		})
+		txErr = o.breaker.Execute(ctx, notificationRequest)
+		if txErr != nil {
+			return txErr
+		}
+
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
 
 		return nil
 	})
@@ -634,11 +696,6 @@ func (o *SubOrder) createFullPaymentOrder(
 			return txErr
 		}
 
-		go func() {
-			wg.Wait()
-			close(resultChan)
-		}()
-
 		txErr = o.repository.GetOrderPayment().
 			Create(ctx, tx, &orderPaymentDTO.OrderPaymentRequest{
 				Amount:      request.Amount,
@@ -651,6 +708,41 @@ func (o *SubOrder) createFullPaymentOrder(
 		if txErr != nil {
 			return txErr
 		}
+
+		notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err = o.sendToWhatsapp(
+					ctx,
+					expiredAt,
+					order.CustomerPhone,
+					subOrder.UUID.String(),
+					request.Amount,
+					paymentResponse.PaymentLink,
+				)
+				resultChan <- ClientResponse{
+					notificationError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.notificationError != nil {
+				txErr = result.notificationError
+				return nil, txErr
+			}
+
+			return nil, nil
+		})
+		txErr = o.breaker.Execute(ctx, notificationRequest)
+		if txErr != nil {
+			return txErr
+		}
+
+		go func() {
+			wg.Wait()
+			close(resultChan)
+		}()
 
 		return nil
 	})
@@ -676,6 +768,37 @@ func (o *SubOrder) createFullPaymentOrder(
 		},
 	}
 	return &response, nil
+}
+
+func (o *SubOrder) sendToWhatsapp(
+	ctx context.Context,
+	expiredAt time.Time,
+	phoneNumber string,
+	orderID string,
+	amount float64,
+	paymentLink string,
+) error {
+	expiredDay := expiredAt.Format("02")
+	expiredMonth := helper.ConvertToIndonesianMonth(expiredAt.Format("January"))
+	expiredYear := expiredAt.Format("2006")
+	expiredHour := expiredAt.Format("15:04")
+	payload := &notificationClient.NotificationRequest{
+		TemplateID:  config.Config.InternalService.Notification.TemplateID,
+		PhoneNumber: phoneNumber,
+		Data: notificationClient.SendWhatsappData{
+			OrderID:     orderID,
+			Description: constant.PTDownPaymentIndonesianTitle.String(),
+			Amount:      fmt.Sprintf("Rp. %s", helper.RupiahFormat(&amount)),
+			PaymentLink: paymentLink,
+			ExpiredAt:   fmt.Sprintf("%s %s %s %s", expiredDay, expiredMonth, expiredYear, expiredHour),
+		},
+	}
+	err := o.client.GetNotification().SendToWhatsapp(ctx, payload)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (o *SubOrder) generatePaymentLink(

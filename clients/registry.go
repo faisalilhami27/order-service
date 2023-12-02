@@ -3,6 +3,7 @@ package clients
 import (
 	clientConfig "order-service/clients/config"
 	invoiceClient "order-service/clients/invoice"
+	notificationClient "order-service/clients/notification"
 	paymentClient "order-service/clients/payment"
 	weddingPackageClient "order-service/clients/weddingpackage"
 	"order-service/common/sentry"
@@ -17,6 +18,7 @@ type IClientRegistry interface {
 	GetPayment() paymentClient.IPaymentClient
 	GetWeddingPackage() weddingPackageClient.IWeddingPackageClient
 	GetInvoice() invoiceClient.IInvoiceClient
+	GetNotification() notificationClient.INotificationClient
 }
 
 func NewClientRegistry(sentry sentry.ISentry) IClientRegistry {
@@ -49,5 +51,14 @@ func (c *Client) GetInvoice() invoiceClient.IInvoiceClient {
 		clientConfig.NewClientConfig(
 			clientConfig.WithBaseURL(config.Config.InternalService.Invoice.Host),
 			clientConfig.WithSecretKey(config.Config.InternalService.Invoice.SecretKey),
+		))
+}
+
+func (c *Client) GetNotification() notificationClient.INotificationClient {
+	return notificationClient.NewNotificationClient(
+		c.sentry,
+		clientConfig.NewClientConfig(
+			clientConfig.WithBaseURL(config.Config.InternalService.Notification.Host),
+			clientConfig.WithSecretKey(config.Config.InternalService.Notification.SecretKey),
 		))
 }

@@ -49,7 +49,7 @@ func (i *IWeddingPackage) GetDetailPackage(ctx context.Context, uuid string) (*P
 		Set(constant.XServiceName, config.Config.AppName).
 		Set(constant.XApiKey, apiKey).
 		Set(constant.XRequestAt, fmt.Sprintf("%d", unixTime)).
-		Get(fmt.Sprintf("%s/api/v1/weddingpackage/%s", i.client.BaseURL(), uuid))
+		Get(fmt.Sprintf("%s/api/v1/package/%s", i.client.BaseURL(), uuid))
 
 	resp, _, errs := clone.EndStruct(&response)
 	if len(errs) > 0 {
