@@ -917,7 +917,6 @@ func (o *SubOrder) processPayment(
 		isPaid              = false
 		order               *models.Order
 		total               float64
-		indonesianTitle     string
 		wg                  sync.WaitGroup
 		resultChan          = make(chan ClientResponse, 1)
 		span                = o.sentry.StartSpan(ctx, logCtx)
@@ -1021,6 +1020,7 @@ func (o *SubOrder) processPayment(
 			items := make([]invoiceModel.Item, 0, len(allSubOrder))
 			var totalPrice float64
 			for _, item := range allSubOrder {
+				var indonesianTitle string
 				switch item.PaymentType {
 				case constant.PTDownPayment:
 					indonesianTitle = constant.PTDownPaymentIndonesianTitle.String()
