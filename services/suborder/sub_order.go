@@ -1018,20 +1018,10 @@ func (o *SubOrder) processPayment(
 				return txErr
 			}
 			items := make([]invoiceModel.Item, 0, len(allSubOrder))
-			for _, item := range allSubOrder {
-				//var indonesianTitle string
-				//switch item.PaymentType {
-				//case constant.PTDownPayment:
-				//	indonesianTitle = constant.PTDownPaymentIndonesianTitle.String()
-				//case constant.PTHalfPayment:
-				//	indonesianTitle = constant.PTHalfPaymentIndonesianTitle.String()
-				//case constant.PTFullPayment:
-				//	indonesianTitle = constant.PTFullPaymentIndonesianTitle.String()
-				//}
-
+			for i := 0; i < len(allSubOrder); i++ {
 				items = append(items, invoiceModel.Item{
-					Description: "",
-					Price:       helper.RupiahFormat(&item.Amount),
+					Description: allSubOrder[i].SubOrderName,
+					Price:       helper.RupiahFormat(&allSubOrder[i].Amount),
 				})
 			}
 
