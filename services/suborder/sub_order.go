@@ -1072,7 +1072,7 @@ func (o *SubOrder) processPayment(
 									IsPaid:                     isPaid,
 								},
 								Items: items,
-								Total: helper.RupiahFormat(&total),
+								Total: helper.RupiahFormat(&totalPrice),
 							},
 						},
 					)
