@@ -201,3 +201,7 @@ func RupiahFormat(amount *float64) string {
 	}
 	return stringValue
 }
+
+func NewPointer[T any](t T) *T {
+	return &t
+}

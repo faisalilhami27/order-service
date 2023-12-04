@@ -61,11 +61,20 @@
       "staticKey": "",
       "templateID": ""
     },
-    "notification": {
+   "notification": {
       "host": "http://localhost:8007",
       "secretKey": "",
       "staticKey": "",
-      "templateID": ""
-    },
+      "templates": [
+         {
+           "name": "prepaid",
+           "templateID": ""
+         },
+         {
+           "name": "postpaid",
+           "templateID": ""
+         }
+      ]
+   }
   }
 }

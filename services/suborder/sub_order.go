@@ -11,6 +11,7 @@ import (
 	packageClient "order-service/clients/weddingpackage"
 	"order-service/config"
 	"order-service/utils/helper/rbac"
+	"order-service/utils/helper/template"
 
 	"strings"
 	"time"
@@ -341,18 +342,34 @@ func (o *SubOrder) createDownPaymentOrder(
 			return txErr
 		}
 
+		//nolint:dupl
 		notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			templateID := template.GetTemplateIDByName(constant.Prepaid)
+			expiredDay := expiredAt.Format("02")
+			expiredMonth := helper.ConvertToIndonesianMonth(expiredAt.Format("January"))
+			expiredYear := expiredAt.Format("2006")
+			expiredHour := expiredAt.Format("15:04")
+			expiredAtString := fmt.Sprintf("%s %s %s %s", expiredDay, expiredMonth, expiredYear, expiredHour)
+			whatsappRequest := &notificationClient.NotificationRequest{
+				TemplateID:  *templateID,
+				PhoneNumber: order.CustomerPhone,
+				Data: &notificationClient.SendWhatsappData{
+					OrderID:     subOrder.SubOrderName,
+					Description: constant.PTDownPaymentIndonesianTitle.String(),
+					ExpiredAt:   expiredAtString,
+					Amount:      helper.RupiahFormat(&request.Amount),
+				},
+				Button: &notificationClient.Button{
+					URL: &notificationClient.URL{
+						Display: constant.PrepaidDisplayButton,
+						Link:    paymentResponse.PaymentLink,
+					},
+				},
+			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = o.sendToWhatsapp(
-					ctx,
-					expiredAt,
-					order.CustomerPhone,
-					subOrder.UUID.String(),
-					request.Amount,
-					paymentResponse.PaymentLink,
-				)
+				err = o.sendToWhatsapp(ctx, whatsappRequest)
 				resultChan <- ClientResponse{
 					notificationError: err,
 				}
@@ -525,18 +542,34 @@ func (o *SubOrder) createHalfPaymentOrder(
 			return txErr
 		}
 
+		//nolint:dupl
 		notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			templateID := template.GetTemplateIDByName(constant.Prepaid)
+			expiredDay := expiredAt.Format("02")
+			expiredMonth := helper.ConvertToIndonesianMonth(expiredAt.Format("January"))
+			expiredYear := expiredAt.Format("2006")
+			expiredHour := expiredAt.Format("15:04")
+			expiredAtString := fmt.Sprintf("%s %s %s %s", expiredDay, expiredMonth, expiredYear, expiredHour)
+			whatsappRequest := &notificationClient.NotificationRequest{
+				TemplateID:  *templateID,
+				PhoneNumber: order.CustomerPhone,
+				Data: &notificationClient.SendWhatsappData{
+					OrderID:     subOrder.SubOrderName,
+					Description: constant.PTHalfPaymentIndonesianTitle.String(),
+					ExpiredAt:   expiredAtString,
+					Amount:      helper.RupiahFormat(&request.Amount),
+				},
+				Button: &notificationClient.Button{
+					URL: &notificationClient.URL{
+						Display: constant.PrepaidDisplayButton,
+						Link:    paymentResponse.PaymentLink,
+					},
+				},
+			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = o.sendToWhatsapp(
-					ctx,
-					expiredAt,
-					order.CustomerPhone,
-					subOrder.UUID.String(),
-					request.Amount,
-					paymentResponse.PaymentLink,
-				)
+				err = o.sendToWhatsapp(ctx, whatsappRequest)
 				resultChan <- ClientResponse{
 					notificationError: err,
 				}
@@ -709,18 +742,34 @@ func (o *SubOrder) createFullPaymentOrder(
 			return txErr
 		}
 
+		//nolint:dupl
 		notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			templateID := template.GetTemplateIDByName(constant.Prepaid)
+			expiredDay := expiredAt.Format("02")
+			expiredMonth := helper.ConvertToIndonesianMonth(expiredAt.Format("January"))
+			expiredYear := expiredAt.Format("2006")
+			expiredHour := expiredAt.Format("15:04")
+			expiredAtString := fmt.Sprintf("%s %s %s %s", expiredDay, expiredMonth, expiredYear, expiredHour)
+			whatsappRequest := &notificationClient.NotificationRequest{
+				TemplateID:  *templateID,
+				PhoneNumber: order.CustomerPhone,
+				Data: &notificationClient.SendWhatsappData{
+					OrderID:     subOrder.SubOrderName,
+					Description: constant.PTFullPaymentIndonesianTitle.String(),
+					ExpiredAt:   expiredAtString,
+					Amount:      helper.RupiahFormat(&request.Amount),
+				},
+				Button: &notificationClient.Button{
+					URL: &notificationClient.URL{
+						Display: constant.PrepaidDisplayButton,
+						Link:    paymentResponse.PaymentLink,
+					},
+				},
+			}
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				err = o.sendToWhatsapp(
-					ctx,
-					expiredAt,
-					order.CustomerPhone,
-					subOrder.UUID.String(),
-					request.Amount,
-					paymentResponse.PaymentLink,
-				)
+				err = o.sendToWhatsapp(ctx, whatsappRequest)
 				resultChan <- ClientResponse{
 					notificationError: err,
 				}
@@ -772,27 +821,8 @@ func (o *SubOrder) createFullPaymentOrder(
 
 func (o *SubOrder) sendToWhatsapp(
 	ctx context.Context,
-	expiredAt time.Time,
-	phoneNumber string,
-	orderID string,
-	amount float64,
-	paymentLink string,
+	payload *notificationClient.NotificationRequest,
 ) error {
-	expiredDay := expiredAt.Format("02")
-	expiredMonth := helper.ConvertToIndonesianMonth(expiredAt.Format("January"))
-	expiredYear := expiredAt.Format("2006")
-	expiredHour := expiredAt.Format("15:04")
-	payload := &notificationClient.NotificationRequest{
-		TemplateID:  config.Config.InternalService.Notification.TemplateID,
-		PhoneNumber: phoneNumber,
-		Data: notificationClient.SendWhatsappData{
-			OrderID:     orderID,
-			Description: constant.PTDownPaymentIndonesianTitle.String(),
-			Amount:      fmt.Sprintf("Rp. %s", helper.RupiahFormat(&amount)),
-			PaymentLink: paymentLink,
-			ExpiredAt:   fmt.Sprintf("%s %s %s %s", expiredDay, expiredMonth, expiredYear, expiredHour),
-		},
-	}
 	err := o.client.GetNotification().SendToWhatsapp(ctx, payload)
 	if err != nil {
 		return err
@@ -918,7 +948,7 @@ func (o *SubOrder) processPayment(
 		order               *models.Order
 		total               float64
 		wg                  sync.WaitGroup
-		resultChan          = make(chan ClientResponse, 1)
+		resultChan          = make(chan ClientResponse, 2)
 		span                = o.sentry.StartSpan(ctx, logCtx)
 	)
 	ctx = o.sentry.SpanContext(span)
@@ -1083,13 +1113,10 @@ func (o *SubOrder) processPayment(
 				}()
 
 				result := <-resultChan
-				if result.paymentError != nil {
-					txErr = result.paymentError
+				if result.invoiceError != nil {
+					txErr = result.invoiceError
 					return nil, txErr
 				}
-
-				wg.Wait()
-				close(resultChan)
 
 				return invoiceResponse, nil
 			})
@@ -1107,6 +1134,46 @@ func (o *SubOrder) processPayment(
 			if txErr != nil {
 				return txErr
 			}
+
+			notificationRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+				templateID := template.GetTemplateIDByName(constant.Postpaid)
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					err = o.sendToWhatsapp(
+						ctx,
+						&notificationClient.NotificationRequest{
+							TemplateID:  *templateID,
+							PhoneNumber: order.CustomerPhone,
+							Button: &notificationClient.Button{
+								URL: &notificationClient.URL{
+									Display: constant.InvoiceButton,
+									Link:    invoiceResponse.URL,
+								},
+							},
+						})
+					resultChan <- ClientResponse{
+						notificationError: err,
+					}
+				}()
+
+				result := <-resultChan
+				if result.notificationError != nil {
+					txErr = result.notificationError
+					return nil, txErr
+				}
+
+				return nil, nil
+			})
+			txErr = o.breaker.Execute(ctx, notificationRequest)
+			if txErr != nil {
+				return txErr
+			}
+
+			go func() {
+				wg.Wait()
+				close(resultChan)
+			}()
 		}
 
 		return nil

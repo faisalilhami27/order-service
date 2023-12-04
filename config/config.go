@@ -69,10 +69,15 @@ type Invoice struct {
 }
 
 type Notification struct {
-	Host       string `json:"host" yaml:"host"`
-	SecretKey  string `json:"secretKey" yaml:"secretKey"`
+	Host      string      `json:"host" yaml:"host"`
+	SecretKey string      `json:"secretKey" yaml:"secretKey"`
+	StaticKey string      `json:"staticKey" yaml:"staticKey"`
+	Templates []Templates `json:"templates" yaml:"templates"`
+}
+
+type Templates struct {
+	Name       string `json:"name" yaml:"name"`
 	TemplateID string `json:"templateID" yaml:"templateID"`
-	StaticKey  string `json:"staticKey" yaml:"staticKey"`
 }
 
 type Payment struct {
