@@ -16,3 +16,13 @@ var (
 	ErrUnauthorized            = errors.New("unauthorized")
 	ErrForbidden               = errors.New("you don't have permission to access this resource")
 )
+
+var GeneralErrors = []error{
+	ErrInvalidStatusTransition,
+	ErrSQLError,
+	ErrOrderDate,
+	ErrStatus,
+	ErrTooManyRequest,
+	ErrUnauthorized,
+	ErrForbidden,
+}

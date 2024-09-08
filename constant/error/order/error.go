@@ -14,3 +14,14 @@ var (
 	ErrFullPaymentNotEmpty = errors.New(`error: your bill for 100% has been paid`)
 	ErrHalfPaymentNotEmpty = errors.New(`error: your bill for 50% has been paid`)
 )
+
+var OrderErrors = []error{
+	ErrOrderNotFound,
+	ErrPreviousOrderNotEmpty,
+	ErrOrderIsEmpty,
+	ErrCancelOrder,
+	ErrInvalidHalfAmount,
+	ErrInvalidFullAmount,
+	ErrFullPaymentNotEmpty,
+	ErrHalfPaymentNotEmpty,
+}

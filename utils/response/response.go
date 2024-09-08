@@ -2,7 +2,6 @@ package response
 
 import (
 	"github.com/gin-gonic/gin"
-
 	"net/http"
 
 	"order-service/common/sentry"
@@ -34,9 +33,13 @@ func HTTPResponse(param ParamHTTPResp) {
 		return
 	}
 
-	var message = param.Err.Error()
+	message := http.StatusText(http.StatusInternalServerError)
 	if param.Message != nil {
 		message = *param.Message
+	} else if param.Err != nil {
+		if constant.ErrorMapping(param.Err) {
+			message = param.Err.Error()
+		}
 	}
 
 	param.Gin.JSON(param.Code, Response{
