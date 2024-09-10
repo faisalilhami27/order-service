@@ -93,7 +93,7 @@ func BindFromConsul(dest any, endPoint, path string) error {
 		return err
 	}
 
-	log.Errorf("using config from consul: %s/%s.\n", endPoint, path)
+	log.Infof("using config from consul: %s/%s.\n", endPoint, path)
 
 	err = v.Unmarshal(dest)
 	if err != nil {
