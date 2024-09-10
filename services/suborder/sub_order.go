@@ -213,9 +213,9 @@ func (o *SubOrder) createDownPaymentOrder(
 
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error {
-		total := float64(10000000) * float64(1000000) / 100
+		total := float64(10000000)
 		if total != request.Amount {
-			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", 10000000) //nolint:err113
+			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", total) //nolint:err113
 			return newError
 		}
 
