@@ -47,26 +47,20 @@ pipeline {
       }
     }
 
-    stage('Install GolangCI-Lint') {
-       steps {
-        sh '''
-          # Set GOPATH
-          export GOPATH=$(go env GOPATH)
-          export PATH=$PATH:$GOPATH/bin
-
-          if ! [ -x "$(command -v golangci-lint)" ]; then
-            echo "golangci-lint not found, installing..."
-            go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
-          else
-            echo "golangci-lint is already installed"
-          fi
-        '''
-      }
-    }
-
     stage('Install Dependencies') {
       steps {
         script {
+          sh '''
+            export GOPATH=$(go env GOPATH)
+            export PATH=$PATH:$GOPATH/bin
+
+            if ! [ -x "$(command -v golangci-lint)" ]; then
+              echo "golangci-lint not found, installing..."
+              go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
+            else
+              echo "golangci-lint is already installed"
+            fi
+          '''
           sh 'go mod tidy'
         }
       }
