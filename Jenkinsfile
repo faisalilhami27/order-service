@@ -46,6 +46,19 @@ pipeline {
       }
     }
 
+    stage('Install GolangCI-Lint') {
+       steps {
+        sh '''
+          if ! [ -x "$(command -v golangci-lint)" ]; then
+            echo "golangci-lint not found, installing..."
+            go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+          else
+            echo "golangci-lint is already installed"
+          fi
+        '''
+      }
+    }
+
     stage('Install Dependencies') {
       steps {
         script {
@@ -57,7 +70,7 @@ pipeline {
     stage('Run Linter') {
       steps {
         script {
-          sh 'make linter'
+          sh 'golangci-lint run --out-format html > golangci-lint.html'
         }
       }
     }
@@ -65,7 +78,7 @@ pipeline {
     stage('Run Unit Test') {
       steps {
         script {
-          sh 'make test'
+          sh 'go test'
         }
       }
     }
