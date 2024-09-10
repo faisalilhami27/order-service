@@ -43,16 +43,8 @@
   "kafkaConsumerGroupID": "consumer-group-local",
 
   "internalService": {
-    "rbac": {
-      "host": "http://localhost:8003",
-      "secretKey": ""
-    },
     "payment": {
       "host": "http://localhost:8004",
-      "secretKey": ""
-    },
-    "package": {
-      "host": "http://localhost:8005",
       "secretKey": ""
     },
     "invoice": {
@@ -61,20 +53,5 @@
       "staticKey": "",
       "templateID": ""
     },
-   "notification": {
-      "host": "http://localhost:8007",
-      "secretKey": "",
-      "staticKey": "",
-      "templates": [
-         {
-           "name": "prepaid",
-           "templateID": ""
-         },
-         {
-           "name": "postpaid",
-           "templateID": ""
-         }
-      ]
-   }
   }
 }
