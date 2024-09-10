@@ -215,7 +215,7 @@ func (o *SubOrder) createDownPaymentOrder(
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		total := float64(10000000)
 		if total != request.Amount {
-			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", total) //nolint:err113
+			newError := fmt.Errorf("down payment must be %d%% from wedding package price", total) //nolint:err113,govet,staticcheck,lll
 			return newError
 		}
 
