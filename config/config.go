@@ -54,11 +54,9 @@ type Database struct {
 }
 
 type InternalService struct {
-	Payment      Payment      `json:"payment" yaml:"payment"`
-	RBAC         RBAC         `json:"rbac" yaml:"rbac"`
-	Package      Package      `json:"package" yaml:"package"`
-	Invoice      Invoice      `json:"invoice" yaml:"invoice"`
-	Notification Notification `json:"notification" yaml:"notification"`
+	Payment Payment `json:"payment" yaml:"payment"`
+	Package Package `json:"package" yaml:"package"`
+	Invoice Invoice `json:"invoice" yaml:"invoice"`
 }
 
 type Invoice struct {
@@ -68,24 +66,12 @@ type Invoice struct {
 	StaticKey  string `json:"staticKey" yaml:"staticKey"`
 }
 
-type Notification struct {
-	Host      string      `json:"host" yaml:"host"`
-	SecretKey string      `json:"secretKey" yaml:"secretKey"`
-	StaticKey string      `json:"staticKey" yaml:"staticKey"`
-	Templates []Templates `json:"templates" yaml:"templates"`
-}
-
 type Templates struct {
 	Name       string `json:"name" yaml:"name"`
 	TemplateID string `json:"templateID" yaml:"templateID"`
 }
 
 type Payment struct {
-	Host      string `json:"host" yaml:"host"`
-	SecretKey string `json:"secretKey" yaml:"secretKey"`
-}
-
-type RBAC struct {
 	Host      string `json:"host" yaml:"host"`
 	SecretKey string `json:"secretKey" yaml:"secretKey"`
 }

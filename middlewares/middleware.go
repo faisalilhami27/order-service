@@ -1,7 +1,6 @@
 package middlewares
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -11,8 +10,6 @@ import (
 	"github.com/didip/tollbooth/limiter"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
-
-	clientConfig "order-service/clients/config"
 
 	"order-service/config"
 	"order-service/constant"
@@ -54,80 +51,6 @@ func ValidateAPIKey() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Next()
-	}
-}
-
-func AuthenticateRBAC() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		token := c.GetHeader(constant.Authorization)
-		if token == "" {
-			c.JSON(http.StatusUnauthorized, response.Response{
-				Status:  constantError.Error,
-				Message: constantError.ErrUnauthorized.Error(),
-			})
-			c.Abort()
-			return
-		}
-
-		client := clientConfig.NewClientConfig(
-			clientConfig.WithBaseURL(config.Config.InternalService.RBAC.Host),
-			clientConfig.WithSecretKey(config.Config.InternalService.RBAC.SecretKey))
-
-		rbac := NewRBACMiddleware(client)
-		user, err := rbac.GetUserLogin(token)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, response.Response{
-				Status:  constantError.Error,
-				Message: err.Error(),
-			})
-			c.Abort()
-			return
-		}
-
-		userLogin := c.Request.WithContext(context.WithValue(c.Request.Context(), constant.UserLogin, user)) //nolint:staticcheck,lll
-		c.Request = userLogin
-		c.Set(constant.Token, token)
-		c.Next()
-	}
-}
-
-func CheckPermission(permissions []string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		token, ok := c.Get(constant.Token)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, response.Response{
-				Status:  constantError.Error,
-				Message: constantError.ErrUnauthorized.Error(),
-			})
-			c.Abort()
-			return
-		}
-
-		client := clientConfig.NewClientConfig(
-			clientConfig.WithBaseURL(config.Config.InternalService.RBAC.Host),
-			clientConfig.WithSecretKey(config.Config.InternalService.RBAC.SecretKey))
-
-		rbac := NewRBACMiddleware(client)
-		user, err := rbac.CheckPermission(token.(string), permissions)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, response.Response{
-				Status:  constantError.Error,
-				Message: err.Error(),
-			})
-			c.Abort()
-			return
-		}
-
-		if !user.Allowed {
-			c.JSON(http.StatusForbidden, response.Response{
-				Status:  constantError.Error,
-				Message: constantError.ErrForbidden.Error(),
-			})
-			c.Abort()
-			return
-		}
-
 		c.Next()
 	}
 }

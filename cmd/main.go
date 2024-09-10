@@ -116,7 +116,6 @@ var restCmd = &cobra.Command{
 			})
 		})
 		router.Use(middlewares.ValidateAPIKey())
-		router.Use(middlewares.AuthenticateRBAC())
 		router.Use(func(c *gin.Context) {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 			c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH")
