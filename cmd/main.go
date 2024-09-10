@@ -102,6 +102,7 @@ var restCmd = &cobra.Command{
 			})
 		})
 
+		// Rate Limiter
 		lmt := tollbooth.NewLimiter(
 			config.Config.RateLimiterMaxRequest,
 			&limiter.ExpirableOptions{
