@@ -175,7 +175,7 @@ func ConvertToIndonesianMonth(englishMonth string) string {
 
 	indonesianMonth, found := monthMap[englishMonth]
 	if !found {
-		return errors.New("month not found").Error() //nolint:goerr113
+		return errors.New("month not found").Error() //nolint:err113
 	}
 
 	return indonesianMonth

@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	invoiceModel "order-service/clients/invoice"
-	packageClient "order-service/clients/weddingpackage"
 	"order-service/config"
 
 	"strings"
@@ -42,7 +41,6 @@ type SubOrder struct {
 }
 
 type ClientResponse struct {
-	packageData       *packageClient.PackageData
 	paymentData       *paymentClient.PaymentData
 	invoiceData       *invoiceModel.InvoiceData
 	packageError      error
@@ -201,7 +199,6 @@ func (o *SubOrder) createDownPaymentOrder(
 		order           *models.Order
 		txErr           error
 		paymentResponse *paymentClient.PaymentData
-		packageResponse *packageClient.PackageData
 		err             error
 		orderHistories  []orderHistoryDTO.OrderHistoryRequest
 		wg              sync.WaitGroup
@@ -218,33 +215,9 @@ func (o *SubOrder) createDownPaymentOrder(
 
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error {
-		packageRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				packageResponse, err = o.client.GetWeddingPackage().GetDetailPackage(ctx, request.PackageID.String())
-				resultChan <- ClientResponse{
-					packageData:  packageResponse,
-					packageError: err,
-				}
-			}()
-
-			result := <-resultChan
-			if result.packageError != nil {
-				txErr = result.packageError
-				return nil, txErr
-			}
-
-			return packageResponse, nil
-		})
-		txErr = o.breaker.Execute(ctx, packageRequest)
-		if txErr != nil {
-			return txErr
-		}
-
-		total := float64(packageResponse.Price) * float64(packageResponse.MinimalDownPayment) / 100
+		total := float64(10000000) * float64(1000000) / 100
 		if total != request.Amount {
-			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", packageResponse.MinimalDownPayment) //nolint:goerr113,lll
+			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", 10000000) //nolint:err113,lll
 			return newError
 		}
 
@@ -261,12 +234,11 @@ func (o *SubOrder) createDownPaymentOrder(
 		}
 
 		order, txErr = o.repository.GetOrder().Create(ctx, tx, &orderDTO.OrderRequest{
-			CustomerID:                 request.CustomerID.String(),
-			CustomerName:               "Muhammad Arshaka Zayn Mumtaz",
-			CustomerEmail:              "zayn@gmail.com",
-			CustomerPhone:              "085792284938",
-			PackageID:                  request.PackageID.String(),
-			RemainingOutstandingAmount: float64(packageResponse.Price),
+			CustomerID:    request.CustomerID.String(),
+			CustomerName:  "Muhammad Arshaka Zayn Mumtaz",
+			CustomerEmail: "zayn@gmail.com",
+			CustomerPhone: "085792284938",
+			PackageID:     request.PackageID.String(),
 		})
 		if txErr != nil {
 			return txErr

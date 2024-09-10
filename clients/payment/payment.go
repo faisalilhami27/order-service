@@ -72,7 +72,7 @@ func (p *IPayment) CreatePaymentLink(ctx context.Context, request *PaymentReques
 		if err != nil {
 			return nil, err
 		}
-		paymentError := fmt.Errorf("payment response: %s", errResponse.Message) //nolint:goerr113
+		paymentError := fmt.Errorf("payment response: %s", errResponse.Message) //nolint:err113
 		return nil, paymentError
 	}
 

@@ -4,7 +4,6 @@ import (
 	clientConfig "order-service/clients/config"
 	invoiceClient "order-service/clients/invoice"
 	paymentClient "order-service/clients/payment"
-	weddingPackageClient "order-service/clients/weddingpackage"
 	"order-service/common/sentry"
 	"order-service/config"
 )
@@ -15,7 +14,6 @@ type Client struct {
 
 type IClientRegistry interface {
 	GetPayment() paymentClient.IPaymentClient
-	GetWeddingPackage() weddingPackageClient.IWeddingPackageClient
 	GetInvoice() invoiceClient.IInvoiceClient
 }
 
@@ -31,15 +29,6 @@ func (c *Client) GetPayment() paymentClient.IPaymentClient {
 		clientConfig.NewClientConfig(
 			clientConfig.WithBaseURL(config.Config.InternalService.Payment.Host),
 			clientConfig.WithSecretKey(config.Config.InternalService.Payment.SecretKey),
-		))
-}
-
-func (c *Client) GetWeddingPackage() weddingPackageClient.IWeddingPackageClient {
-	return weddingPackageClient.NewWeddingPackageClient(
-		c.sentry,
-		clientConfig.NewClientConfig(
-			clientConfig.WithBaseURL(config.Config.InternalService.Package.Host),
-			clientConfig.WithSecretKey(config.Config.InternalService.Package.SecretKey),
 		))
 }
 

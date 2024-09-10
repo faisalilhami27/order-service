@@ -56,7 +56,7 @@ func (p *IInvoice) GenerateInvoice(ctx context.Context, request *InvoiceRequest)
 		if err != nil {
 			return nil, err
 		}
-		invoiceError := fmt.Errorf("invoice response: %s", errResponse.Message) //nolint:goerr113
+		invoiceError := fmt.Errorf("invoice response: %s", errResponse.Message) //nolint:err113
 		return nil, invoiceError
 	}
 
