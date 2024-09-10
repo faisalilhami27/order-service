@@ -13,6 +13,7 @@ pipeline {
     REPOSITORY = 'order-service'
     PROJECT_ID = credentials('gcp-project-id')
     GOOGLE_CREDENTIALS = credentials('google-service-account-key')
+    GOLANGCI_LINT_VERSION = 'v1.61.0'
   }
 
   stages {
@@ -49,9 +50,13 @@ pipeline {
     stage('Install GolangCI-Lint') {
        steps {
         sh '''
+          # Set GOPATH
+          export GOPATH=$(go env GOPATH)
+          export PATH=$PATH:$GOPATH/bin
+
           if ! [ -x "$(command -v golangci-lint)" ]; then
             echo "golangci-lint not found, installing..."
-            go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+            go install github.com/golangci/golangci-lint/cmd/golangci-lint@${GOLANGCI_LINT_VERSION}
           else
             echo "golangci-lint is already installed"
           fi
@@ -69,9 +74,11 @@ pipeline {
 
     stage('Run Linter') {
       steps {
-        script {
-          sh 'golangci-lint run --out-format html > golangci-lint.html'
-        }
+        sh '''
+          export GOPATH=$(go env GOPATH)
+          export PATH=$PATH:$GOPATH/bin
+          golangci-lint run --out-format html > golangci-lint.html
+        '''
       }
     }
 
