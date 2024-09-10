@@ -131,7 +131,7 @@ func SetEnvFromConsulKV(v *viper.Viper) error {
 		case reflect.Int:
 			val = strconv.Itoa(int(valOf.Int()))
 		case reflect.Uint:
-			val = strconv.Itoa(int(valOf.Uint()))
+			val = strconv.Itoa(int(valOf.Uint())) //nolint:gosec
 		case reflect.Float64:
 			val = strconv.Itoa(int(valOf.Float()))
 		case reflect.Float32:

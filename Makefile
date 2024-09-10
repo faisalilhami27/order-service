@@ -25,7 +25,7 @@ test: ## Run test
 
 ## Mock
 mock-prepare: ## Install mockery
-	go install github.com/vektra/mockery/v2@v2.36.0
+	go install github.com/vektra/mockery/v2@v2.45.1
 
 mock: ## Generate mock files
 	mockery --all --keeptree --recursive=true --outpkg=mocks

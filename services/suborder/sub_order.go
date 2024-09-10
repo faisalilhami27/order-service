@@ -41,12 +41,10 @@ type SubOrder struct {
 }
 
 type ClientResponse struct {
-	paymentData       *paymentClient.PaymentData
-	invoiceData       *invoiceModel.InvoiceData
-	packageError      error
-	invoiceError      error
-	paymentError      error
-	notificationError error
+	paymentData  *paymentClient.PaymentData
+	invoiceData  *invoiceModel.InvoiceData
+	invoiceError error
+	paymentError error
 }
 
 type ISubOrderService interface {
@@ -188,7 +186,7 @@ func (o *SubOrder) randomNumber() int {
 	return number
 }
 
-//nolint:cyclop,gocognit
+//nolint:cyclop
 func (o *SubOrder) createDownPaymentOrder(
 	ctx context.Context,
 	request *subOrderDTO.SubOrderRequest,
@@ -217,7 +215,7 @@ func (o *SubOrder) createDownPaymentOrder(
 	err = tx.Transaction(func(tx *gorm.DB) error {
 		total := float64(10000000) * float64(1000000) / 100
 		if total != request.Amount {
-			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", 10000000) //nolint:err113,lll
+			newError := fmt.Errorf("down payment must be %d%% from weddingpackage price", 10000000) //nolint:err113
 			return newError
 		}
 

@@ -39,7 +39,7 @@ import (
 var restCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Command to start http server",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, args []string) { //nolint:revive
 		_ = godotenv.Load() //nolint:errcheck
 		config.Init()
 		db, err := config.InitDatabase()

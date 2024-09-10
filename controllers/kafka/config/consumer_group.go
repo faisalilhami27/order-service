@@ -93,7 +93,7 @@ func (c *ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim 
 
 			for retries > 0 {
 				c.retryWg.Add(1)
-				go func(retries int) {
+				go func(retries int) { //nolint:revive
 					defer c.Recover()
 					defer c.retryWg.Done()
 					err = handler(ctx, message)
@@ -144,7 +144,7 @@ func (c *ConsumerGroup) RegisterTopicHandler(topicName TopicName, handler Handle
 	defer c.mu.Unlock()
 
 	c.handlers[topicName] = handler
-	log.Infof(fmt.Sprintf("registered handler: %s", topicName))
+	log.Infof(fmt.Sprintf("registered handler: %s", topicName)) //nolint:govet
 }
 
 func (c *ConsumerGroup) generateRequestID(ctx context.Context, requestID *string) context.Context {

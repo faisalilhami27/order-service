@@ -52,7 +52,7 @@ func NewCircuitBreaker(sentry sentry.ISentry, options ...Option) ICircuitBreaker
 		Name:        circuitBreaker.name,
 		MaxRequests: circuitBreaker.maxRequests,
 		Interval:    time.Duration(circuitBreaker.timeout) * time.Second,
-		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) {
+		OnStateChange: func(name string, from gobreaker.State, to gobreaker.State) { //nolint:revive
 			log.Infof("Circuit Breaker state changed from %s to %s\n", from, to)
 		},
 	})
