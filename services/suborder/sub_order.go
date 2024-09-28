@@ -18,6 +18,7 @@ import (
 
 	"order-service/clients"
 	paymentClient "order-service/clients/payment"
+	packageClient "order-service/clients/weddingpackage"
 	"order-service/common/circuitbreaker"
 	"order-service/common/sentry"
 	errorGeneral "order-service/constant/error"
@@ -41,10 +42,12 @@ type SubOrder struct {
 }
 
 type ClientResponse struct {
+	packageData  *packageClient.PackageData
 	paymentData  *paymentClient.PaymentData
 	invoiceData  *invoiceModel.InvoiceData
 	invoiceError error
 	paymentError error
+	packageError error
 }
 
 type ISubOrderService interface {
@@ -197,6 +200,7 @@ func (o *SubOrder) createDownPaymentOrder(
 		order           *models.Order
 		txErr           error
 		paymentResponse *paymentClient.PaymentData
+		packageResponse *packageClient.PackageData
 		err             error
 		orderHistories  []orderHistoryDTO.OrderHistoryRequest
 		wg              sync.WaitGroup
@@ -213,10 +217,36 @@ func (o *SubOrder) createDownPaymentOrder(
 
 	tx := o.repository.GetTx()
 	err = tx.Transaction(func(tx *gorm.DB) error {
-		total := float64(10000000)
+		packageRequest := circuitbreaker.BreakerFunc(func() (interface{}, error) {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				packageResponse, err = o.client.GetWeddingPackage().GetDetailPackage(ctx, request.PackageID.String())
+				resultChan <- ClientResponse{
+					packageData:  packageResponse,
+					packageError: err,
+				}
+			}()
+
+			result := <-resultChan
+			if result.packageError != nil {
+				txErr = result.packageError
+				return nil, txErr
+			}
+
+			return packageResponse, nil
+		})
+
+		txErr = o.breaker.Execute(ctx, packageRequest)
+		if txErr != nil {
+			return txErr
+		}
+
+		total := float64(packageResponse.Price) * float64(packageResponse.MinimalDownPayment) / 100
 		if total != request.Amount {
-			newError := fmt.Errorf("down payment must be 5%% from wedding package price") //nolint:err113
-			return newError
+			errMessage := fmt.Errorf("down payment must be %d%% from wedding package price", packageResponse.MinimalDownPayment) //nolint:goerr113,lll
+			errOrder.CustomErrorOrder(errMessage)
+			return errMessage
 		}
 
 		customerID, _ := uuid.Parse(request.CustomerID.String()) //nolint:errcheck
@@ -232,11 +262,12 @@ func (o *SubOrder) createDownPaymentOrder(
 		}
 
 		order, txErr = o.repository.GetOrder().Create(ctx, tx, &orderDTO.OrderRequest{
-			CustomerID:    request.CustomerID.String(),
-			CustomerName:  "Muhammad Arshaka Zayn Mumtaz",
-			CustomerEmail: "zayn@gmail.com",
-			CustomerPhone: "085792284938",
-			PackageID:     request.PackageID.String(),
+			CustomerID:                 request.CustomerID.String(),
+			CustomerName:               "Muhammad Arshaka Zayn Mumtaz",
+			CustomerEmail:              "zayn@gmail.com",
+			CustomerPhone:              "085792284938",
+			PackageID:                  request.PackageID.String(),
+			RemainingOutstandingAmount: float64(packageResponse.Price),
 		})
 		if txErr != nil {
 			return txErr
@@ -673,6 +704,7 @@ func (o *SubOrder) generatePaymentLink(
 			},
 		},
 	})
+
 	if err != nil {
 		return nil, err
 	}

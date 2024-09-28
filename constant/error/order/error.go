@@ -25,3 +25,7 @@ var OrderErrors = []error{
 	ErrFullPaymentNotEmpty,
 	ErrHalfPaymentNotEmpty,
 }
+
+func CustomErrorOrder(err error) {
+	OrderErrors = append(OrderErrors, err)
+}

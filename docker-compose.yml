@@ -1,5 +1,4 @@
-version: '3.9'
-
+name: wedding-app
 services:
   order-app:
     container_name: order-app
@@ -7,7 +6,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8002:8002"
+      - "8011:8011"
     environment:
       CONSUL_HTTP_URL: ${CONSUL_HTTP_URL}
       CONSUL_HTTP_KEY: ${CONSUL_HTTP_KEY}
