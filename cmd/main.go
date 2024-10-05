@@ -113,7 +113,7 @@ var restCmd = &cobra.Command{
 		router.GET("/", func(c *gin.Context) {
 			c.JSON(http.StatusOK, response.Response{
 				Status:  "success",
-				Message: "Welcome to Order Service",
+				Message: "Welcome to Order Service API",
 			})
 		})
 		router.Use(middlewares.ValidateAPIKey())
